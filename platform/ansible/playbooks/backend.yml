@@ -1,0 +1,56 @@
+---
+- name: Deploy OpenHVX and initialize its data services
+  hosts: cp[0]
+  become: true
+  tasks:
+    - name: Copy private rendered resources
+      ansible.builtin.copy:
+        src: "{{ infra_work }}/openhvx.yml"
+        dest: /root/openhvx.yml
+        mode: '0600'
+      no_log: true
+    - name: Wait for ingress CRDs
+      ansible.builtin.command: k3s kubectl get crd tlsstores.traefik.io
+      register: ingress_crd
+      until: ingress_crd.rc == 0
+      retries: 60
+      delay: 5
+      changed_when: false
+    - name: Apply deployment resources
+      ansible.builtin.command: k3s kubectl apply -f /root/openhvx.yml
+      register: backend_apply
+      changed_when: "'created' in backend_apply.stdout or 'configured' in backend_apply.stdout"
+    - name: Wait for MongoDB processes
+      ansible.builtin.command: k3s kubectl -n openhvx rollout status statefulset/mongo --timeout=600s
+      changed_when: false
+    - name: Initialize replica set if it does not exist
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - -n
+          - openhvx
+          - exec
+          - mongo-0
+          - --
+          - sh
+          - -c
+          - >-
+            mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval
+            'try { rs.status() } catch(e) { if (e.code !== 94) throw e; rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo-0.mongo.openhvx.svc.cluster.local:27017"},{_id:1,host:"mongo-1.mongo.openhvx.svc.cluster.local:27017"},{_id:2,host:"mongo-2.mongo.openhvx.svc.cluster.local:27017"}]}) }'
+      changed_when: false
+    - name: Wait for MongoDB primary election
+      ansible.builtin.command:
+        argv: [k3s, kubectl, -n, openhvx, exec, mongo-0, --, sh, -c, 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval ''if (!db.hello().primary) quit(1)''']
+      register: mongo_primary
+      until: mongo_primary.rc == 0
+      retries: 60
+      delay: 5
+      changed_when: false
+    - name: Wait for RabbitMQ cluster
+      ansible.builtin.command: k3s kubectl -n openhvx rollout status statefulset/rabbitmq --timeout=600s
+      changed_when: false
+    - name: Wait for backend workloads
+      ansible.builtin.command: "k3s kubectl -n openhvx rollout status {{ item }} --timeout=600s"
+      loop: [deployment/auth, deployment/controller, deployment/api-gateway, statefulset/ws-broker, deployment/ceph-connector]
+      changed_when: false

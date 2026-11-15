@@ -1,0 +1,16 @@
+---
+- name: Vérifier l'administration distante Windows
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Attendre WinRM depuis le contrôleur
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 5986
+        timeout: 3600
+      delegate_to: localhost
+    - name: Attendre une session authentifiée
+      ansible.builtin.wait_for_connection:
+        timeout: 3600
+    - name: Vérifier Windows
+      ansible.windows.win_ping:

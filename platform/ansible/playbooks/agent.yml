@@ -1,0 +1,78 @@
+---
+- name: Install protocol v2 Hyper-V agents with persistent journals
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Create protected runtime and journal directories
+      ansible.windows.win_powershell:
+        script: |
+          $root = 'C:\OpenHVX\Agent'
+          $data = 'C:\OpenHVX\Data'
+          $Ansible.Changed = $false
+          foreach ($path in @($root,$data)) {
+            if (!(Test-Path $path)) { New-Item -ItemType Directory -Path $path -Force | Out-Null; $Ansible.Changed = $true }
+            & icacls $path /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+          }
+    - name: Copy compiled agent package
+      ansible.windows.win_copy:
+        src: "{{ infra_work }}/agent.zip"
+        dest: C:\OpenHVX\agent.zip
+      register: agent_package
+    - name: Copy trusted lab CA
+      ansible.windows.win_copy:
+        src: "{{ infra_work }}/../ca.pem"
+        dest: C:\OpenHVX\Agent\ca.pem
+    - name: Prepare storage initiator and isolated default VM switch
+      ansible.windows.win_powershell:
+        script: |
+          $Ansible.Changed = $false
+          $service = Get-Service MSiSCSI
+          if ($service.StartType -ne 'Automatic') { Set-Service MSiSCSI -StartupType Automatic; $Ansible.Changed = $true }
+          if ($service.Status -ne 'Running') { Start-Service MSiSCSI; $Ansible.Changed = $true }
+          if (!(Get-VMSwitch -Name fabric0 -ErrorAction SilentlyContinue)) {
+            New-VMSwitch -Name fabric0 -SwitchType Private | Out-Null
+            $Ansible.Changed = $true
+          }
+    - name: Write private agent configuration
+      ansible.windows.win_copy:
+        dest: C:\OpenHVX\Agent\config.json
+        content: "{{ {'agentId': inventory_hostname, 'rabbitmqUrl': 'amqps://openhvx:' + rabbit_password + '@192.168.50.20:30671/', 'heartbeatIntervalSec': 30, 'inventoryIntervalSec': 60, 'basePath': 'C:\\OpenHVX\\Data', 'journalPath': 'C:\\OpenHVX\\Data\\agent-state\\operations.db', 'capabilities': ['inventory','vm.power','vm.create','vm.delete','echo','console','vm.edit']} | to_nice_json }}"
+      no_log: true
+      register: agent_config
+    - name: Write agent launcher
+      ansible.windows.win_copy:
+        dest: C:\OpenHVX\Agent\start.ps1
+        content: |
+          $ErrorActionPreference = 'Stop'
+          $env:AMQP_QUEUE_TYPE = 'quorum'
+          Set-Location 'C:\OpenHVX\Agent'
+          $process = Start-Process -FilePath 'C:\OpenHVX\Agent\openhvx-agent.exe' -ArgumentList '-config C:\OpenHVX\Agent\config.json' -WorkingDirectory 'C:\OpenHVX\Agent' -NoNewWindow -Wait -PassThru -RedirectStandardOutput 'C:\OpenHVX\Agent\agent.log' -RedirectStandardError 'C:\OpenHVX\Agent\agent-error.log'
+          exit $process.ExitCode
+      register: agent_launcher
+    - name: Install and start the agent scheduled task
+      ansible.windows.win_powershell:
+        parameters:
+          Update: "{{ agent_package.changed or agent_config.changed or agent_launcher.changed }}"
+        script: |
+          param([bool]$Update)
+          $ErrorActionPreference = 'Stop'
+          $Ansible.Changed = $false
+          $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('C:\OpenHVX\Agent\ca.pem')
+          if (!(Test-Path ('Cert:\LocalMachine\Root\' + $cert.Thumbprint))) {
+            Import-Certificate -FilePath 'C:\OpenHVX\Agent\ca.pem' -CertStoreLocation Cert:\LocalMachine\Root | Out-Null
+            $Ansible.Changed = $true
+          }
+          $task = Get-ScheduledTask -TaskName OpenHVX-Agent -ErrorAction SilentlyContinue
+          if ($Update -or !$task) {
+            if ($task) { Stop-ScheduledTask -TaskName OpenHVX-Agent; Start-Sleep -Seconds 3 }
+            Expand-Archive -Path 'C:\OpenHVX\agent.zip' -DestinationPath 'C:\OpenHVX\Agent' -Force
+            $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File C:\OpenHVX\Agent\start.ps1' -WorkingDirectory 'C:\OpenHVX\Agent'
+            $trigger = New-ScheduledTaskTrigger -AtStartup
+            $settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable -MultipleInstances IgnoreNew
+            Register-ScheduledTask -TaskName OpenHVX-Agent -Action $action -Trigger $trigger -Settings $settings -User SYSTEM -RunLevel Highest -Force | Out-Null
+            $Ansible.Changed = $true
+          }
+          if ((Get-ScheduledTask -TaskName OpenHVX-Agent).State -ne 'Running') {
+            Start-ScheduledTask -TaskName OpenHVX-Agent
+            $Ansible.Changed = $true
+          }

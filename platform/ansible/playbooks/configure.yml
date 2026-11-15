@@ -1,0 +1,8 @@
+---
+- name: Configure Windows host and Hyper-V
+  hosts: all
+  gather_facts: false
+  roles:
+    - windows_base
+    - windows_rdp
+    - hyperv_host

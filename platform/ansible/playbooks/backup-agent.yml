@@ -1,0 +1,32 @@
+---
+- name: Back up quiescent Windows agent journals without changing identity
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Stop the agent briefly for a consistent local journal copy
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          try {
+            Stop-ScheduledTask -TaskName OpenHVX-Agent
+            $deadline = (Get-Date).AddSeconds(15)
+            while ((Get-Process openhvx-agent -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
+            if (Get-Process openhvx-agent -ErrorAction SilentlyContinue) { throw 'Agent still running; refusing an inconsistent journal copy' }
+            Copy-Item 'C:\OpenHVX\Data\agent-state\operations.db' 'C:\OpenHVX\Agent\journal-backup.db' -Force
+          } finally { Start-ScheduledTask -TaskName OpenHVX-Agent }
+    - name: Read private journal snapshot
+      ansible.windows.slurp:
+        src: C:\OpenHVX\Agent\journal-backup.db
+      register: journal_backup
+      no_log: true
+    - name: Store journal snapshot on the deployment controller
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -c
+          - "import base64,pathlib,sys; p=pathlib.Path(sys.argv[1]); p.write_bytes(base64.b64decode(sys.stdin.buffer.read())); p.chmod(0o600)"
+          - "{{ backup_dir }}/{{ inventory_hostname }}-operations.db"
+        stdin: "{{ journal_backup.content }}"
+      delegate_to: localhost
+      become: false
+      no_log: true

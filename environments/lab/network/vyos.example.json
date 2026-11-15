@@ -1,0 +1,6 @@
+{
+  "version": "replace-with-exact-built-image-version",
+  "image": "/absolute/path/to/vyos-cloud-init.vhdx",
+  "sha256": "replace-with-verified-sha256-of-the-vhdx",
+  "systemGiB": 10
+}

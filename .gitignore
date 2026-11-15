@@ -1,0 +1,47 @@
+# Local tooling and secrets
+.mise.local.toml
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+*.crt
+*.csr
+*.sops*
+
+# OpenTofu state and plans
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+
+# Editor / OS
+.vscode/
+.DS_Store
+*.swp
+*.log
+
+# Local lab artifacts
+images/*.iso
+images/*.vhdx
+images/*.qcow2
+images/*.img
+
+# Documentation generated outputs
+/docs/generated/
+
+.venv/
+__pycache__/
+*.tfvars
+!*.tfvars.example
+environments/lab/hosts.yml
+*.iso
+*.qcow2
+*.vhdx
+*.img
+
+.ansible/
+
+.lab/
+*.auto.tfvars.json

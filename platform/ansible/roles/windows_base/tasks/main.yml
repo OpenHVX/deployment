@@ -1,0 +1,24 @@
+---
+- name: Maintenir WinRM actif
+  ansible.windows.win_service:
+    name: WinRM
+    start_mode: auto
+    state: started
+- name: Restreindre la règle HTTPS du lab au réseau de management
+  community.windows.win_firewall_rule:
+    name: OpenHVX-WinRM-HTTPS
+    enabled: true
+    state: present
+    action: allow
+    direction: in
+    localport: 5986
+    protocol: tcp
+    remoteip: "{{ management_cidr | default(lab_management_cidr) }}"
+
+- name: Retirer les fichiers de réponse après le premier accès authentifié
+  ansible.windows.win_file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - C:\Windows\Panther\unattend.xml
+    - C:\Windows\Panther\Unattend\unattend.xml

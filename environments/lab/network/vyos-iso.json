@@ -1,0 +1,11 @@
+{
+  "version": "2026.11.14-0016-rolling",
+  "url": "https://github.com/vyos/vyos-nightly-build/releases/download/2026.11.14-0016-rolling/vyos-2026.11.14-0016-rolling-generic-amd64.iso",
+  "sha256": "d0d34eccc74485deb4a5c093f1c3c36faf293e7b5c8ddda8a0e9658a5edf77d3",
+  "digestSource": "https://api.github.com/repos/vyos/vyos-nightly-build/releases/tags/2026.11.14-0016-rolling",
+  "cloudInit": {
+    "version": "22.1-499-g34443040-1~bddeb",
+    "url": "https://packages.vyos.net/repositories/rolling/pool/main/c/cloud-init/cloud-init_22.1-499-g34443040-1~bddeb_all.deb",
+    "sha256": "2a2e73d3dc62144136e3acc5043f2423af9a3c9fcd1fa0c2d0c3c585a7802f8a"
+  }
+}

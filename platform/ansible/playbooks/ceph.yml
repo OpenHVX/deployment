@@ -1,0 +1,197 @@
+---
+- name: Install Ceph host prerequisites
+  hosts: ceph
+  become: true
+  tasks:
+    - name: Download cephadm
+      ansible.builtin.get_url:
+        url: https://download.ceph.com/rpm-squid/el9/noarch/cephadm
+        dest: /usr/local/sbin/cephadm
+        mode: '0755'
+    - name: Enable kernel modules needed by iSCSI gateways
+      ansible.builtin.shell: |
+        modprobe target_core_user
+        modprobe iscsi_target_mod
+        printf 'target_core_user\niscsi_target_mod\n' > /etc/modules-load.d/openhvx-iscsi.conf
+      changed_when: false
+    - name: Inspect dedicated OSD disk
+      ansible.builtin.command: lsblk -b -ndo SIZE /dev/sdb
+      register: osd_size
+      changed_when: false
+    - name: Require the declared dedicated OSD device
+      ansible.builtin.assert:
+        that: osd_size.stdout | int == 60 * 1024 * 1024 * 1024
+- name: Bootstrap Ceph and enroll hosts
+  hosts: ceph[0]
+  become: true
+  tasks:
+    - name: Install Dashboard TLS material
+      ansible.builtin.copy:
+        src: "{{ infra_work }}/{{ item }}"
+        dest: "/root/{{ item }}"
+        mode: '0600'
+      loop: [dashboard.crt, dashboard.key]
+      register: dashboard_tls
+      no_log: true
+    - name: Bootstrap pinned Ceph release
+      ansible.builtin.command:
+        argv:
+          - /usr/local/sbin/cephadm
+          - --image
+          - quay.io/ceph/ceph:v19.2.3
+          - bootstrap
+          - --mon-ip
+          - "{{ ansible_host }}"
+          - --initial-dashboard-user
+          - openhvx
+          - --initial-dashboard-password
+          - "{{ ceph_dashboard_password }}"
+          - --dashboard-password-noupdate
+          - --dashboard-crt
+          - /root/dashboard.crt
+          - --dashboard-key
+          - /root/dashboard.key
+          - --skip-monitoring-stack
+        creates: /etc/ceph/ceph.conf
+      no_log: true
+    - name: Update Dashboard certificate after rotation
+      ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/dashboard.crt:/root/dashboard.crt -- ceph dashboard set-ssl-certificate -i /root/dashboard.crt
+      when: dashboard_tls.changed
+    - name: Update Dashboard key after rotation
+      ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/dashboard.key:/root/dashboard.key -- ceph dashboard set-ssl-certificate-key -i /root/dashboard.key
+      when: dashboard_tls.changed
+      no_log: true
+    - name: Reload Dashboard after certificate rotation
+      ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph mgr module {{ item }} dashboard"
+      loop: [disable, enable]
+      when: dashboard_tls.changed
+    - name: Read cluster SSH public key
+      ansible.builtin.slurp:
+        src: /etc/ceph/ceph.pub
+      register: ceph_pub
+    - name: Allow cephadm to manage cluster hosts
+      ansible.builtin.lineinfile:
+        path: /root/.ssh/authorized_keys
+        line: "{{ ceph_pub.content | b64decode | trim }}"
+        create: true
+        mode: '0600'
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['ceph'] }}"
+    - name: Enroll Ceph hosts
+      ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch host add {{ item }} {{ hostvars[item].ansible_host }}"
+      loop: "{{ groups['ceph'] }}"
+      changed_when: false
+    - name: Tune OSD memory for the nested lab
+      ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph config set osd osd_memory_target 2147483648
+      changed_when: false
+    - name: Place three monitors
+      ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch apply mon --placement=3"
+      changed_when: false
+    - name: Read existing OSD placement
+      ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch ps --daemon-type osd --format json
+      register: existing_osds
+      changed_when: false
+    - name: Add dedicated data disks without zapping or wiping
+      ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch daemon add osd {{ item }}:/dev/sdb"
+      when: item not in (existing_osds.stdout | from_json | map(attribute='hostname') | list)
+      loop: "{{ groups['ceph'] }}"
+    - name: Wait for three up OSDs
+      ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph osd stat --format json
+      register: osds
+      until: (osds.stdout | from_json).num_up_osds | int == 3
+      retries: 60
+      delay: 10
+      changed_when: false
+    - name: Read existing pools
+      ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph osd pool ls --format json
+      register: pools
+      changed_when: false
+    - name: Create RBD pools
+      ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph osd pool create {{ item }}"
+      when: item not in (pools.stdout | from_json)
+      loop: [rbd, catalog]
+    - name: Enable RBD pool application
+      ansible.builtin.command: "/usr/local/sbin/cephadm shell -- rbd pool init {{ item }}"
+      loop: [rbd, catalog]
+      changed_when: false
+    - name: Render iSCSI service specification
+      ansible.builtin.copy:
+        dest: /root/openhvx-iscsi.yml
+        mode: '0600'
+        content: |
+          service_type: iscsi
+          service_id: openhvx
+          placement:
+            hosts: {{ groups['ceph'] | to_json }}
+          spec:
+            pool: rbd
+            api_user: openhvx
+            api_password: {{ ceph_iscsi_password | to_json }}
+            api_secure: false
+            trusted_ip_list: {{ (groups['ceph'] | map('extract', hostvars, 'ansible_host') | list) | join(',') }}
+      no_log: true
+    - name: Apply iSCSI gateway service
+      ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/openhvx-iscsi.yml:/root/openhvx-iscsi.yml -- ceph orch apply -i /root/openhvx-iscsi.yml
+      changed_when: false
+- name: Expose the active Ceph Dashboard through a stable private VIP
+  hosts: ceph
+  become: true
+  tasks:
+    - name: Install Dashboard VIP failover
+      ansible.builtin.apt:
+        name: keepalived
+        state: present
+    - name: Trust the Dashboard issuing CA
+      ansible.builtin.copy:
+        src: "{{ infra_work }}/../ca.pem"
+        dest: /etc/openhvx-ca.pem
+        mode: '0644'
+    - name: Check local active-manager API without following standby redirects
+      ansible.builtin.copy:
+        dest: /usr/local/sbin/openhvx-dashboard-active
+        mode: '0755'
+        content: |
+          #!/bin/sh
+          code=$(curl --silent --cacert /etc/openhvx-ca.pem --connect-timeout 1 --max-time 2 --output /dev/null --write-out '%{http_code}' https://{{ ansible_host }}:8443/api/health/minimal)
+          case "$code" in 200|401) exit 0 ;; *) exit 1 ;; esac
+    - name: Configure active-manager-only Dashboard VIP
+      ansible.builtin.copy:
+        dest: /etc/keepalived/keepalived.conf
+        mode: '0600'
+        content: |
+          global_defs {
+            enable_script_security
+            script_user root
+          }
+          vrrp_script dashboard_active {
+            script "/usr/local/sbin/openhvx-dashboard-active"
+            interval 2
+            timeout 3
+            fall 2
+            rise 2
+          }
+          vrrp_instance CEPH_DASHBOARD {
+            state BACKUP
+            interface eth0
+            virtual_router_id 51
+            priority {{ 110 - groups['ceph'].index(inventory_hostname) * 10 }}
+            advert_int 1
+            unicast_src_ip {{ ansible_host }}
+            unicast_peer {
+          {% for host in groups['ceph'] if host != inventory_hostname %}
+              {{ hostvars[host].ansible_host }}
+          {% endfor %}
+            }
+            virtual_ipaddress {
+              192.168.50.30/24 dev eth0
+            }
+            track_script {
+              dashboard_active
+            }
+          }
+      register: ceph_vip
+    - name: Enable Dashboard VIP service
+      ansible.builtin.service:
+        name: keepalived
+        enabled: true
+        state: "{{ 'restarted' if ceph_vip.changed else 'started' }}"

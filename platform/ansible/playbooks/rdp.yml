@@ -1,0 +1,6 @@
+---
+- name: Activer RDP sur les hôtes Hyper-V
+  hosts: all
+  gather_facts: false
+  roles:
+    - windows_rdp

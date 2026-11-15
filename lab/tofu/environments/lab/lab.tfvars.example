@@ -1,0 +1,11 @@
+# Copier vers lab.auto.tfvars (ignoré par Git), puis adapter les chemins.
+os_iso_path = "/chemin/absolu/WindowsServer.iso"
+firmware_path = "/usr/share/edk2/x64/OVMF_CODE.4m.fd"
+management_cidr = "192.168.50.0/24"
+vcpu = 8
+memory = 32768
+disk_size = 200
+# seed_iso_path = "/chemin/absolu/answer-and-virtio.iso"
+
+# Ressources ci-dessus par hôte Hyper-V.
+host_count = 3

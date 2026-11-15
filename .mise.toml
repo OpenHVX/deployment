@@ -1,0 +1,103 @@
+[tools]
+opentofu = "1.8.8"
+python = "3.12.10"
+jq = "1.7.1"
+yq = "4.44.2"
+age = "1.2.1"
+sops = "3.9.4"
+
+[env]
+_.path = ["{{config_root}}/.venv/bin"]
+
+[tasks.bootstrap]
+run = "./scripts/bootstrap.sh"
+
+[tasks."check:host"]
+run = "./lab/scripts/check-host.sh"
+
+[tasks."tofu:init"]
+run = "./lab/scripts/tofu-init.sh"
+
+[tasks."tofu:plan"]
+run = "./lab/scripts/tofu-plan.sh"
+
+[tasks."tofu:apply"]
+run = "./lab/scripts/tofu-apply.sh"
+
+[tasks."ansible:bootstrap"]
+run = "./lab/scripts/ansible-bootstrap.sh"
+
+[tasks."ansible:configure"]
+run = "./lab/scripts/run-platform.sh"
+
+[tasks."lab:up"]
+run = "./lab/scripts/lab-up.sh"
+
+[tasks."lab:down"]
+run = "./lab/scripts/lab-down.sh"
+
+[tasks.test]
+run = "./scripts/test.sh"
+
+[tasks."inventory:generate"]
+run = "./lab/scripts/inventory-generate.sh"
+
+[tasks."windows:prepare"]
+run = "python lab/scripts/prepare-windows.py"
+
+[tasks."test:lab"]
+run = "./lab/scripts/test-lab.sh"
+
+[tasks."ansible:rdp"]
+run = "PLATFORM_PLAYBOOK=platform/ansible/playbooks/rdp.yml ./lab/scripts/run-platform.sh"
+
+[tasks."lab:hosts:up"]
+run = "./lab/scripts/lab-hosts-up.sh"
+
+[tasks."platform:deploy"]
+run = "./platform/deploy.sh"
+
+[tasks."platform:verify"]
+run = "PLATFORM_PLAYBOOK=platform/ansible/playbooks/verify.yml ./platform/deploy.sh"
+
+[tasks."lab:platform:up"]
+run = "python lab/scripts/platform-up.py"
+
+[tasks."lab:platform:verify"]
+run = "python lab/scripts/smoke-api.py"
+
+[tasks."lab:platform:storage-test"]
+run = "python -u lab/scripts/smoke-storage.py --run stable"
+
+[tasks."lab:platform:failover-test"]
+run = "python -u lab/scripts/check-failover.py"
+
+[tasks."lab:platform:backup"]
+run = "python lab/scripts/backup-platform.py"
+
+[tasks."lab:network:plan"]
+run = "python lab/scripts/prepare-vyos.py --plan"
+
+[tasks."lab:network:deploy"]
+run = "python lab/scripts/deploy-network-poc.py"
+
+[tasks."lab:network:verify"]
+run = "python lab/scripts/smoke-network.py"
+
+[tasks."lab:network:vyos-up"]
+run = "python lab/scripts/vyos-up.py"
+
+[tasks."lab:network:inspect"]
+run = "python lab/scripts/inspect-network.py"
+
+[tasks."lab:network:vyos-image"]
+run = "python lab/scripts/build-vyos-image.py"
+
+[tasks."lab:network:vyos-status"]
+run = "python lab/scripts/vyos-status.py"
+
+[tasks."lab:network:vyos-verify"]
+run = "python lab/scripts/verify-vyos.py"
+
+[tasks."lab:network:vyos-down"]
+run = "python lab/scripts/vyos-down.py"

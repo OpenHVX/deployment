@@ -1,0 +1,45 @@
+---
+- name: Autoriser les connexions Bureau à distance
+  ansible.windows.win_regedit:
+    path: HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server
+    name: fDenyTSConnections
+    data: 0
+    type: dword
+
+- name: Exiger NLA pour RDP
+  ansible.windows.win_regedit:
+    path: HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp
+    name: UserAuthentication
+    data: 1
+    type: dword
+
+- name: Maintenir le service RDP actif
+  ansible.windows.win_service:
+    name: TermService
+    start_mode: auto
+    state: started
+
+- name: Désactiver les règles RDP intégrées non restreintes
+  ansible.windows.win_powershell:
+    script: |
+      $rules = @(Get-NetFirewallRule -Name 'RemoteDesktop*' -ErrorAction SilentlyContinue | Where-Object Enabled -eq 'True')
+      $Ansible.Changed = $rules.Count -gt 0
+      $rules | Disable-NetFirewallRule
+
+- name: Autoriser RDP uniquement depuis le réseau de management
+  community.windows.win_firewall_rule:
+    name: OpenHVX-RDP-TCP
+    enabled: true
+    state: present
+    action: allow
+    direction: in
+    localport: 3389
+    protocol: tcp
+    remoteip: "{{ management_cidr | default(lab_management_cidr) }}"
+
+- name: Vérifier le port RDP depuis le contrôleur
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host }}"
+    port: 3389
+    timeout: 120
+  delegate_to: localhost

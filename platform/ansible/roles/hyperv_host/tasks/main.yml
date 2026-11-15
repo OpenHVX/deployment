@@ -1,0 +1,15 @@
+---
+- name: Installer Hyper-V
+  ansible.windows.win_feature:
+    name: Hyper-V
+    state: present
+    include_management_tools: true
+  register: hyperv_feature
+- name: Redémarrer après installation
+  ansible.windows.win_reboot:
+  when: hyperv_feature.reboot_required
+- name: Démarrer le service de gestion Hyper-V
+  ansible.windows.win_service:
+    name: vmms
+    state: started
+    start_mode: auto
