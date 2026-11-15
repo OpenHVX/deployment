@@ -1,0 +1,17 @@
+vyos:
+  name: openhvx-vyos-02
+  management: 192.168.50.42/24
+  cpu: 2
+  memoryGiB: 2
+  macAddress: 00155D485602
+infrastructure_vms:
+- name: openhvx-cp-02
+  role: cp
+  address: 192.168.50.22
+  system_gib: 40
+  data_gib: 0
+- name: openhvx-ceph-02
+  role: ceph
+  address: 192.168.50.32
+  system_gib: 24
+  data_gib: 60

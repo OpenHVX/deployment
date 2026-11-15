@@ -1,0 +1,8 @@
+---
+- name: Copy deployment image bundle
+  ansible.builtin.copy:
+    src: "{{ infra_work }}/images.tar.gz"
+    dest: /root/openhvx-images.tar.gz
+    mode: '0600'
+- name: Import images into the K3s container runtime
+  ansible.builtin.command: k3s ctr images import /root/openhvx-images.tar.gz

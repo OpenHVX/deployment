@@ -1,0 +1,25 @@
+---
+- name: Install Ceph host prerequisites
+  hosts: ceph
+  become: true
+  tasks:
+    - name: Run ceph prerequisites tasks
+      ansible.builtin.import_role:
+        name: ceph
+        tasks_from: prerequisites
+- name: Bootstrap Ceph and enroll hosts
+  hosts: ceph[0]
+  become: true
+  tasks:
+    - name: Run ceph cluster tasks
+      ansible.builtin.import_role:
+        name: ceph
+        tasks_from: cluster
+- name: Expose the active Ceph Dashboard through a stable private VIP
+  hosts: ceph
+  become: true
+  tasks:
+    - name: Run ceph dashboard-vip tasks
+      ansible.builtin.import_role:
+        name: ceph
+        tasks_from: dashboard-vip

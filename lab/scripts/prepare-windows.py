@@ -56,7 +56,7 @@ def main():
         if not shutil.which(tool): raise SystemExit(f'Outil système requis : {tool}')
     # Evaluate the actual HCL configuration; no ad-hoc parsing of tfvars.
     expression = 'jsonencode({ hosts = local.hyperv_hosts, cidr = var.management_cidr, iso = var.os_iso_path })'
-    result = run('tofu', '-chdir=lab/tofu/environments/lab', 'console', '-no-color', '-var=host_seed_iso_paths={}', input=(expression+'\n').encode())
+    result = run('tofu', '-chdir=tofu/environments/lab', 'console', '-no-color', '-var=host_seed_iso_paths={}', input=(expression+'\n').encode())
     config = json.loads(json.loads(result.stdout.decode().strip()))
     private = ROOT / '.lab'
     private.mkdir(mode=0o700, exist_ok=True)
@@ -149,7 +149,7 @@ def main():
                 '-e',boot,'-no-emul-boot','-o',auto_iso,tmp)
         run('setfacl','-m',f'u:{qemu_user}:r--',auto_iso)
         stamp.write_text(json.dumps(fingerprint))
-    override = ROOT/'lab/tofu/environments/lab/zz-unattended.auto.tfvars.json'
+    override = ROOT/'tofu/environments/lab/zz-unattended.auto.tfvars.json'
     override.write_text(json.dumps({'host_seed_iso_paths':seeds,'os_iso_path':str(auto_iso)},indent=2)+'\n')
     print('Médias prêts. Secret dans .lab/windows-password ; CA dans .lab/ca.pem. Aucune VM effacée ou redémarrée.')
 

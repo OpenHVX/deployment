@@ -10,11 +10,16 @@ WORK = ROOT/'.lab/network'
 
 
 def topology():
-    return [{'host': f'lab-hv{i:02d}', 'name': f'openhvx-vyos-{i:02d}',
-             'management': f'192.168.50.{40+i}/24', 'cpu': 2, 'memoryGiB': 2,
-             'macAddress': f'00155D4856{i:02X}'}
-            for i in range(1, 4)]
-
+    environment = ROOT / 'environments/lab'
+    inventory = yaml.safe_load((environment / 'inventory.yml').read_text())
+    hosts = inventory['all']['children']['hyperv']['hosts']
+    nodes = [dict(host=host, **yaml.safe_load(
+        (environment / 'host_vars' / (host + '.yml')).read_text())['vyos'])
+        for host in hosts]
+    for node in nodes:
+        if node['cpu'] != 2 or node['memoryGiB'] != 2:
+            raise ValueError('The current VyOS lifecycle supports only 2 CPUs and 2 GiB; resize requires a maintenance workflow')
+    return nodes
 
 
 def load_declaration():
@@ -30,7 +35,7 @@ def playbook(name, host=None, extra=None):
         command += ['--limit', host]
     if extra:
         command += ['-e', json.dumps(extra)]
-    subprocess.run(command, cwd=ROOT, env={**os.environ, 'PLATFORM_PLAYBOOK': 'platform/ansible/playbooks/'+name+'.yml'}, check=True)
+    subprocess.run(command, cwd=ROOT, env={**os.environ, 'PLATFORM_PLAYBOOK': 'ansible/playbooks/'+name+'.yml'}, check=True)
 
 
 def status(host=None):
@@ -43,4 +48,4 @@ def status(host=None):
 
 
 def add_host_argument(parser):
-    parser.add_argument('--host', choices=['lab-hv01', 'lab-hv02', 'lab-hv03'], help='Restrict the operation to one declared host')
+    parser.add_argument('--host', choices=[node['host'] for node in topology()], help='Restrict the operation to one declared host')

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+  namespace: openhvx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: rabbitmq
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:4.1.0-management
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5672
+        envFrom:
+        - secretRef:
+            name: rabbitmq-env
+        resources:
+          requests:
+            cpu: 100m
+            memory: 400Mi
+          limits:
+            memory: 1Gi
+        command:
+        - sh
+        - -c
+        args:
+        - export RABBITMQ_NODENAME="rabbit@${HOSTNAME}.rabbitmq.openhvx.svc.cluster.local";
+          exec docker-entrypoint.sh rabbitmq-server
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/rabbitmq
+        - name: config
+          mountPath: /etc/rabbitmq/conf.d/20-openhvx.conf
+          subPath: rabbitmq.conf
+        - name: tls
+          mountPath: /tls
+          readOnly: true
+        readinessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - -q
+            - ping
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          timeoutSeconds: 10
+      terminationGracePeriodSeconds: 45
+      volumes:
+      - name: config
+        configMap:
+          name: rabbit-config
+      - name: tls
+        secret:
+          secretName: rabbit-tls
+  serviceName: rabbitmq
+  podManagementPolicy: Parallel
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 4Gi

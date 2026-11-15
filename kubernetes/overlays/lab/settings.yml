@@ -1,0 +1,3 @@
+# Explicit policy: existing lab registration is closed; network executor is enabled.
+register_enabled: "false"
+network_poc_enabled: "true"

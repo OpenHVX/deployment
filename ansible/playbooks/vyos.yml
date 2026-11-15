@@ -1,0 +1,13 @@
+---
+- name: Bootstrap declared VyOS management VMs without tenant configuration
+  hosts: all
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    ansible_winrm_operation_timeout_sec: 240
+    ansible_winrm_read_timeout_sec: 300
+  tasks:
+    - name: Run vyos main tasks
+      ansible.builtin.import_role:
+        name: vyos
+        tasks_from: main

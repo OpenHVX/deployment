@@ -1,4 +1,0 @@
----
-- name: Signaler que l'intégration OpenHVX reste à implémenter
-  ansible.builtin.fail:
-    msg: "Phase 2 non implémentée : valider le spike Hyper-V puis définir le backend et l'installation de l'agent."

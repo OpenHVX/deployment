@@ -1,0 +1,59 @@
+---
+- name: Install Dashboard VIP failover
+  ansible.builtin.apt:
+    name: keepalived
+    state: present
+- name: Trust the Dashboard issuing CA
+  ansible.builtin.copy:
+    src: "{{ infra_work }}/../ca.pem"
+    dest: /etc/openhvx-ca.pem
+    mode: '0644'
+- name: Check local active-manager API without following standby redirects
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/openhvx-dashboard-active
+    mode: '0755'
+    content: |
+      #!/bin/sh
+      code=$(curl --silent --cacert /etc/openhvx-ca.pem --connect-timeout 1 --max-time 2 --output /dev/null --write-out '%{http_code}' https://{{ ansible_host }}:8443/api/health/minimal)
+      case "$code" in 200|401) exit 0 ;; *) exit 1 ;; esac
+- name: Configure active-manager-only Dashboard VIP
+  ansible.builtin.copy:
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0600'
+    content: |
+      global_defs {
+        enable_script_security
+        script_user root
+      }
+      vrrp_script dashboard_active {
+        script "/usr/local/sbin/openhvx-dashboard-active"
+        interval 2
+        timeout 3
+        fall 2
+        rise 2
+      }
+      vrrp_instance CEPH_DASHBOARD {
+        state BACKUP
+        interface eth0
+        virtual_router_id 51
+        priority {{ 110 - groups['ceph'].index(inventory_hostname) * 10 }}
+        advert_int 1
+        unicast_src_ip {{ ansible_host }}
+        unicast_peer {
+      {% for host in groups['ceph'] if host != inventory_hostname %}
+          {{ hostvars[host].ansible_host }}
+      {% endfor %}
+        }
+        virtual_ipaddress {
+          192.168.50.30/24 dev eth0
+        }
+        track_script {
+          dashboard_active
+        }
+      }
+  register: ceph_vip
+- name: Enable Dashboard VIP service
+  ansible.builtin.service:
+    name: keepalived
+    enabled: true
+    state: "{{ 'restarted' if ceph_vip.changed else 'started' }}"

@@ -1,0 +1,6 @@
+---
+- name: Prevent bundled CoreDNS from resetting the managed replica count
+  ansible.builtin.copy:
+    dest: /var/lib/rancher/k3s/server/manifests/coredns.yaml.skip
+    content: "# CoreDNS is managed by the OpenHVX deployment playbook.\n"
+    mode: '0644'

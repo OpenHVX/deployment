@@ -1,0 +1,17 @@
+---
+- name: Build OpenHVX container images on the first control VM
+  hosts: cp[0]
+  become: true
+  tasks:
+    - name: Run container_images build tasks
+      ansible.builtin.import_role:
+        name: container_images
+        tasks_from: build
+- name: Load application images into each K3s node
+  hosts: cp
+  become: true
+  tasks:
+    - name: Run container_images import tasks
+      ansible.builtin.import_role:
+        name: container_images
+        tasks_from: import

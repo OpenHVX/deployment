@@ -31,7 +31,7 @@ def main():
         with (directory/name).open('wb') as output:remote('sudo cat '+shlex.quote(source),output)
     for source in [ROOT/'.lab/ca.pem',ROOT/'.lab/ca.key',WORK/'secrets.yml',WORK/'id_ed25519',WORK/'linux.yml',WORK/'windows-vars.yml',WORK/'image-tag']:
         shutil.copyfile(source,directory/source.name)
-    subprocess.run([str(ROOT/'lab/scripts/run-platform.sh'),'-e','backup_dir='+str(directory)],cwd=ROOT,env={**os.environ,'PLATFORM_PLAYBOOK':'platform/ansible/playbooks/backup-agent.yml'},check=True)
+    subprocess.run([str(ROOT/'lab/scripts/run-platform.sh'),'-e','backup_dir='+str(directory)],cwd=ROOT,env={**os.environ,'PLATFORM_PLAYBOOK':'ansible/playbooks/backup-agent.yml'},check=True)
     (directory/'metadata.json').write_text(json.dumps({'kind':'lab-control-plane-checkpoint','createdAt':datetime.now(timezone.utc).isoformat(),'mongoOplogIncluded':True,'windowsJournalsQuiesced':True,'cephOSDDataIncluded':False,'restoreTested':False},indent=2)+'\n')
     print('Private checkpoint saved:',directory)
     print('Ceph/tenant disks are not included; this is not a tested disaster-recovery backup.')

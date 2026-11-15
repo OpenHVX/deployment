@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: network-orchestrator
+  namespace: openhvx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: network-orchestrator
+  template:
+    metadata:
+      labels:
+        app: network-orchestrator
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: network-orchestrator
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: network-orchestrator
+        image: openhvx/network-orchestrator:unconfigured
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3002
+        envFrom:
+        - secretRef:
+            name: network-orchestrator-env
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 768Mi
+      terminationGracePeriodSeconds: 45
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0

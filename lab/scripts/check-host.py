@@ -46,7 +46,7 @@ host_count = int(os.environ.get('LAB_HOST_COUNT', '3'))
 cidr = os.environ.get('LAB_MANAGEMENT_CIDR', '192.168.50.0/24')
 # Inspect the actual saved plan when called by tofu:plan/tofu:apply.
 if len(sys.argv) > 1:
-    plan = json.loads(run('tofu', '-chdir=lab/tofu/environments/lab', 'show', '-json', sys.argv[1]).stdout)
+    plan = json.loads(run('tofu', '-chdir=tofu/environments/lab', 'show', '-json', sys.argv[1]).stdout)
     values = {k: v['value'] for k, v in plan['variables'].items()}
     requested_memory, requested_cpu, requested_disk = (values[k] for k in ('memory', 'vcpu', 'disk_size'))
     cidr = values['management_cidr']

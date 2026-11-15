@@ -1,0 +1,43 @@
+---
+- name: Configure Linux prerequisites
+  hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Run k3s prerequisites tasks
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: prerequisites
+- name: Install HA K3s servers sequentially
+  hosts: cp
+  serial: 1
+  become: true
+  tasks:
+    - name: Run k3s servers tasks
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: servers
+- name: Configure management endpoint failover
+  hosts: cp
+  become: true
+  tasks:
+    - name: Run k3s vip tasks
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: vip
+- name: Retain control of the HA DNS manifest across K3s restarts
+  hosts: cp
+  become: true
+  tasks:
+    - name: Run k3s dns-ownership tasks
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: dns-ownership
+- name: Deploy DNS across three failure domains
+  hosts: cp[0]
+  become: true
+  tasks:
+    - name: Run k3s dns tasks
+      ansible.builtin.import_role:
+        name: k3s
+        tasks_from: dns

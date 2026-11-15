@@ -1,0 +1,13 @@
+---
+- name: Copy the managed CoreDNS manifest
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../kubernetes/coredns.yaml"
+    dest: /root/openhvx-coredns.yaml
+    mode: '0644'
+- name: Apply HA DNS
+  ansible.builtin.command: k3s kubectl apply -f /root/openhvx-coredns.yaml
+  register: dns_apply
+  changed_when: "'created' in dns_apply.stdout or 'configured' in dns_apply.stdout"
+- name: Wait for DNS rollout
+  ansible.builtin.command: k3s kubectl -n kube-system rollout status deployment/coredns --timeout=300s
+  changed_when: false

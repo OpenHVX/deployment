@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ingress-tls
+  namespace: openhvx
+type: kubernetes.io/tls
+stringData:
+  tls.crt: {{ (certificate) | tojson }}
+  tls.key: {{ (private_key) | tojson }}

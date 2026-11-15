@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbit-amqps
+  namespace: openhvx
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+  - port: 5671
+    targetPort: 5671
+    nodePort: 30671
+  type: NodePort

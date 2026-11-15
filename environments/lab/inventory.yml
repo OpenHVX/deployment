@@ -1,0 +1,10 @@
+all:
+  children:
+    hyperv:
+      hosts:
+        lab-hv01:
+          ansible_host: 192.168.50.10
+        lab-hv02:
+          ansible_host: 192.168.50.11
+        lab-hv03:
+          ansible_host: 192.168.50.12

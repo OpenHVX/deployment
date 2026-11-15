@@ -1,8 +1,0 @@
----
-- name: Vérifier le démarrage Hyper-V imbriqué
-  hosts: all
-  gather_facts: false
-  tasks:
-    - name: Démarrer puis supprimer une VM L2 temporaire
-      ansible.windows.win_powershell:
-        script: "{{ lookup('ansible.builtin.file', playbook_dir + '/../../powershell/Test-NestedHyperV.ps1') + '\n$Ansible.Changed = $false' }}"

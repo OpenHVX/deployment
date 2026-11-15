@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbit-config
+  namespace: openhvx
+data:
+  rabbitmq.conf: 'cluster_formation.peer_discovery_backend = classic_config
+
+    cluster_formation.classic_config.nodes.1 = rabbit@rabbitmq-0.rabbitmq.openhvx.svc.cluster.local
+
+    cluster_formation.classic_config.nodes.2 = rabbit@rabbitmq-1.rabbitmq.openhvx.svc.cluster.local
+
+    cluster_formation.classic_config.nodes.3 = rabbit@rabbitmq-2.rabbitmq.openhvx.svc.cluster.local
+
+    disk_free_limit.absolute = 200MB
+
+    vm_memory_high_watermark.absolute = 512MiB
+
+    listeners.ssl.default = 5671
+
+    ssl_options.cacertfile = /tls/ca.pem
+
+    ssl_options.certfile = /tls/tls.crt
+
+    ssl_options.keyfile = /tls/tls.key
+
+    ssl_options.verify = verify_none
+
+    ssl_options.fail_if_no_peer_cert = false
+
+    '

@@ -21,7 +21,7 @@ def main():
     add_host_argument(parser)
     args = parser.parse_args()
     if not args.image_manifest.exists() and args.image_manifest == ROOT/'.lab/network/image.json':
-        subprocess.run([sys.executable, str(ROOT/'lab/scripts/build-vyos-image.py')], check=True)
+        subprocess.run([sys.executable, str(ROOT/'image-builds/vyos/build.py')], check=True)
     subprocess.run([sys.executable, str(ROOT/'lab/scripts/prepare-vyos.py'),
                     '--image-manifest', str(args.image_manifest.resolve())], check=True)
     identities = status(args.host)
@@ -48,7 +48,7 @@ def main():
     try:
         limit = ['--limit', args.host] if args.host else []
         subprocess.run([str(ROOT/'lab/scripts/run-platform.sh'), '-e', '@'+str(ROOT/'.lab/network/windows-vars.yml'), *limit],
-                       cwd=ROOT, env={**os.environ, 'PLATFORM_PLAYBOOK': 'platform/ansible/playbooks/vyos.yml'}, check=True)
+                       cwd=ROOT, env={**os.environ, 'PLATFORM_PLAYBOOK': 'ansible/playbooks/vyos.yml'}, check=True)
     finally:
         server.shutdown()
         server.server_close()

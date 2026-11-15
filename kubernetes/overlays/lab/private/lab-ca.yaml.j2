@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab-ca
+  namespace: openhvx
+data:
+  ca.pem: {{ (ca) | tojson }}

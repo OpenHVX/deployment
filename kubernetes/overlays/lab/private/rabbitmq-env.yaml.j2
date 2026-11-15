@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-env
+  namespace: openhvx
+type: Opaque
+stringData:
+  RABBITMQ_DEFAULT_USER: "openhvx"
+  RABBITMQ_DEFAULT_PASS: {{ (secrets["rabbit_password"]) | tojson }}
+  RABBITMQ_ERLANG_COOKIE: {{ (secrets["rabbit_password"]) | tojson }}
+  RABBITMQ_USE_LONGNAME: "true"

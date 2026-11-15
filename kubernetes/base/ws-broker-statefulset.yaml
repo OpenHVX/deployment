@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ws-broker
+  namespace: openhvx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ws-broker
+  template:
+    metadata:
+      labels:
+        app: ws-broker
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: ws-broker
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: ws-broker
+        image: openhvx/ws-broker:unconfigured
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8081
+        envFrom:
+        - secretRef:
+            name: ws-broker-env
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 768Mi
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          failureThreshold: 60
+          periodSeconds: 5
+        env:
+        - name: BROKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      terminationGracePeriodSeconds: 45
+  serviceName: ws-broker
+  podManagementPolicy: Parallel

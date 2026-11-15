@@ -1,0 +1,33 @@
+---
+- name: Require no unresolved backend tasks before the rollout
+  ansible.builtin.command:
+    argv:
+      - k3s
+      - kubectl
+      - -n
+      - openhvx
+      - exec
+      - deployment/controller
+      - --
+      - node
+      - -e
+      - "{{ lookup('ansible.builtin.file', playbook_dir + '/../../kubernetes/operations/assert-no-active-tasks.cjs') }}"
+  changed_when: false
+- name: Select the declared controller, gateway and executor resources from the rendered manifest
+  ansible.builtin.set_fact:
+    network_objects: "{{ lookup('ansible.builtin.file', infra_work + '/openhvx.yml') | from_yaml_all | selectattr('metadata.name', 'in', ['controller', 'controller-env', 'api-gateway', 'api-gateway-env', 'network-orchestrator', 'network-orchestrator-env']) | list }}"
+  no_log: true
+- name: Stage private network executor manifest
+  ansible.builtin.copy:
+    content: "{{ {'apiVersion': 'v1', 'kind': 'List', 'items': network_objects} | to_nice_json }}"
+    dest: /root/openhvx-network.yml
+    mode: '0600'
+  no_log: true
+- name: Apply the network executor resources
+  ansible.builtin.command: k3s kubectl apply -f /root/openhvx-network.yml
+  register: network_apply
+  changed_when: "'created' in network_apply.stdout or 'configured' in network_apply.stdout"
+- name: Wait for network executor readiness
+  ansible.builtin.command: "k3s kubectl -n openhvx rollout status deployment/{{ item }} --timeout=180s"
+  loop: [controller, api-gateway, network-orchestrator]
+  changed_when: false

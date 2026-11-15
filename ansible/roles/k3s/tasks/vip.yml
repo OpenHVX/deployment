@@ -1,0 +1,45 @@
+---
+- name: Install keepalived
+  ansible.builtin.apt:
+    name: keepalived
+    state: present
+- name: Configure private management VIP
+  ansible.builtin.copy:
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0600'
+    content: |
+      global_defs {
+        enable_script_security
+        script_user root
+      }
+      vrrp_script k3s_running {
+        script "/usr/bin/systemctl is-active --quiet k3s"
+        interval 2
+        fall 3
+        rise 2
+      }
+      vrrp_instance OPENHVX {
+        state BACKUP
+        interface eth0
+        virtual_router_id 50
+        priority {{ 110 - groups['cp'].index(inventory_hostname) * 10 }}
+        advert_int 1
+        unicast_src_ip {{ ansible_host }}
+        unicast_peer {
+      {% for host in groups['cp'] if host != inventory_hostname %}
+          {{ hostvars[host].ansible_host }}
+      {% endfor %}
+        }
+        virtual_ipaddress {
+          192.168.50.20/24 dev eth0
+        }
+        track_script {
+          k3s_running
+        }
+      }
+  register: keepalived_config
+- name: Enable management endpoint failover
+  ansible.builtin.service:
+    name: keepalived
+    enabled: true
+    state: "{{ 'restarted' if keepalived_config.changed else 'started' }}"

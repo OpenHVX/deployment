@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ws-broker-env
+  namespace: openhvx
+type: Opaque
+stringData:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://192.168.50.20"
+  LOG_JSON: "1"
+  LOG_LEVEL: "info"
+  PORT: "8081"
+  MONGO_URL: {{ ("mongodb://openhvx:" ~ secrets["mongo_password"] ~ "@mongo-0.mongo.openhvx.svc.cluster.local:27017,mongo-1.mongo.openhvx.svc.cluster.local:27017,mongo-2.mongo.openhvx.svc.cluster.local:27017/hvwm?replicaSet=rs0&authSource=admin&w=majority") | tojson }}
+  JWT_AGENT_SECRET: {{ (secrets["JWT_AGENT_SECRET"]) | tojson }}
+  JWT_BROWSER_SECRET: {{ (secrets["JWT_BROWSER_SECRET"]) | tojson }}
+  BROKER_PEERS: "{\"ws-broker-0\": \"http://ws-broker-0.ws-broker.openhvx.svc.cluster.local:8081\", \"ws-broker-1\": \"http://ws-broker-1.ws-broker.openhvx.svc.cluster.local:8081\", \"ws-broker-2\": \"http://ws-broker-2.ws-broker.openhvx.svc.cluster.local:8081\"}"
+  WS_ORIGINS: "https://192.168.50.20"

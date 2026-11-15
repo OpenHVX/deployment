@@ -1,0 +1,10 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: "deployment:\n  kind: DaemonSet\n  replicas: 3\ntopologySpreadConstraints:\n\
+    \  - maxSkew: 1\n    topologyKey: kubernetes.io/hostname\n    whenUnsatisfiable:\
+    \ ScheduleAnyway\n    labelSelector:\n      matchLabels:\n        app.kubernetes.io/name:\
+    \ traefik\n"

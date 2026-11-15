@@ -1,0 +1,109 @@
+---
+- name: Install Dashboard TLS material
+  ansible.builtin.copy:
+    src: "{{ infra_work }}/{{ item }}"
+    dest: "/root/{{ item }}"
+    mode: '0600'
+  loop: [dashboard.crt, dashboard.key]
+  register: dashboard_tls
+  no_log: true
+- name: Bootstrap pinned Ceph release
+  ansible.builtin.command:
+    argv:
+      - /usr/local/sbin/cephadm
+      - --image
+      - quay.io/ceph/ceph:v19.2.3
+      - bootstrap
+      - --mon-ip
+      - "{{ ansible_host }}"
+      - --initial-dashboard-user
+      - openhvx
+      - --initial-dashboard-password
+      - "{{ ceph_dashboard_password }}"
+      - --dashboard-password-noupdate
+      - --dashboard-crt
+      - /root/dashboard.crt
+      - --dashboard-key
+      - /root/dashboard.key
+      - --skip-monitoring-stack
+    creates: /etc/ceph/ceph.conf
+  no_log: true
+- name: Update Dashboard certificate after rotation
+  ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/dashboard.crt:/root/dashboard.crt -- ceph dashboard set-ssl-certificate -i /root/dashboard.crt
+  when: dashboard_tls.changed
+- name: Update Dashboard key after rotation
+  ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/dashboard.key:/root/dashboard.key -- ceph dashboard set-ssl-certificate-key -i /root/dashboard.key
+  when: dashboard_tls.changed
+  no_log: true
+- name: Reload Dashboard after certificate rotation
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph mgr module {{ item }} dashboard"
+  loop: [disable, enable]
+  when: dashboard_tls.changed
+- name: Read cluster SSH public key
+  ansible.builtin.slurp:
+    src: /etc/ceph/ceph.pub
+  register: ceph_pub
+- name: Allow cephadm to manage cluster hosts
+  ansible.builtin.lineinfile:
+    path: /root/.ssh/authorized_keys
+    line: "{{ ceph_pub.content | b64decode | trim }}"
+    create: true
+    mode: '0600'
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['ceph'] }}"
+- name: Enroll Ceph hosts
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch host add {{ item }} {{ hostvars[item].ansible_host }}"
+  loop: "{{ groups['ceph'] }}"
+  changed_when: false
+- name: Tune OSD memory for the nested lab
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph config set osd osd_memory_target 2147483648
+  changed_when: false
+- name: Place three monitors
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch apply mon --placement=3"
+  changed_when: false
+- name: Read existing OSD placement
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch ps --daemon-type osd --format json
+  register: existing_osds
+  changed_when: false
+- name: Add dedicated data disks without zapping or wiping
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch daemon add osd {{ item }}:/dev/sdb"
+  when: item not in (existing_osds.stdout | from_json | map(attribute='hostname') | list)
+  loop: "{{ groups['ceph'] }}"
+- name: Wait for three up OSDs
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph osd stat --format json
+  register: osds
+  until: (osds.stdout | from_json).num_up_osds | int == 3
+  retries: 60
+  delay: 10
+  changed_when: false
+- name: Read existing pools
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph osd pool ls --format json
+  register: pools
+  changed_when: false
+- name: Create RBD pools
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph osd pool create {{ item }}"
+  when: item not in (pools.stdout | from_json)
+  loop: [rbd, catalog]
+- name: Enable RBD pool application
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- rbd pool init {{ item }}"
+  loop: [rbd, catalog]
+  changed_when: false
+- name: Render iSCSI service specification
+  ansible.builtin.copy:
+    dest: /root/openhvx-iscsi.yml
+    mode: '0600'
+    content: |
+      service_type: iscsi
+      service_id: openhvx
+      placement:
+        hosts: {{ groups['ceph'] | to_json }}
+      spec:
+        pool: rbd
+        api_user: openhvx
+        api_password: {{ ceph_iscsi_password | to_json }}
+        api_secure: false
+        trusted_ip_list: {{ (groups['ceph'] | map('extract', hostvars, 'ansible_host') | list) | join(',') }}
+  no_log: true
+- name: Apply iSCSI gateway service
+  ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/openhvx-iscsi.yml:/root/openhvx-iscsi.yml -- ceph orch apply -i /root/openhvx-iscsi.yml
+  changed_when: false

@@ -1,0 +1,12 @@
+---
+- name: Provision Linux infrastructure VMs on existing Hyper-V hosts
+  hosts: all
+  gather_facts: false
+  vars:
+    ansible_winrm_operation_timeout_sec: 240
+    ansible_winrm_read_timeout_sec: 300
+  tasks:
+    - name: Run infrastructure_vms main tasks
+      ansible.builtin.import_role:
+        name: infrastructure_vms
+        tasks_from: main

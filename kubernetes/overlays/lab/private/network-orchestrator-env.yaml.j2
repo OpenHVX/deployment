@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: network-orchestrator-env
+  namespace: openhvx
+type: Opaque
+stringData:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://192.168.50.20"
+  LOG_JSON: "1"
+  LOG_LEVEL: "info"
+  PORT: "3002"
+  MONGO_URL: {{ ("mongodb://openhvx:" ~ secrets["mongo_password"] ~ "@mongo-0.mongo.openhvx.svc.cluster.local:27017,mongo-1.mongo.openhvx.svc.cluster.local:27017,mongo-2.mongo.openhvx.svc.cluster.local:27017/openhvx-network?replicaSet=rs0&authSource=admin&w=majority") | tojson }}
+  RMQ_URL: {{ ("amqp://openhvx:" ~ secrets["rabbit_password"] ~ "@rabbitmq:5672/") | tojson }}
+  AMQP_QUEUE_TYPE: "quorum"

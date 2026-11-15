@@ -1,0 +1,9 @@
+---
+- name: Install protocol v2 Hyper-V agents with persistent journals
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Run openhvx_agent main tasks
+      ansible.builtin.import_role:
+        name: openhvx_agent
+        tasks_from: main

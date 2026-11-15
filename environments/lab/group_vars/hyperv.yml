@@ -1,0 +1,9 @@
+---
+management_cidr: 192.168.50.0/24
+ansible_user: "{{ lookup('env', 'LAB_WINDOWS_USER') | default('Administrator', true) }}"
+ansible_password: "{{ lookup('env', 'LAB_WINDOWS_PASSWORD') }}"
+ansible_connection: winrm
+ansible_port: 5986
+ansible_winrm_scheme: https
+ansible_winrm_transport: ntlm
+ansible_winrm_server_cert_validation: validate

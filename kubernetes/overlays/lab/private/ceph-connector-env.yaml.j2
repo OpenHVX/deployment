@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceph-connector-env
+  namespace: openhvx
+type: Opaque
+stringData:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://192.168.50.20"
+  LOG_JSON: "1"
+  LOG_LEVEL: "info"
+  PORT: "3000"
+  STORAGE_CONTROLLER_AGENT_ID: "storage-controller-1"
+  RMQ_URL: {{ ("amqp://openhvx:" ~ secrets["rabbit_password"] ~ "@rabbitmq:5672/") | tojson }}
+  AMQP_QUEUE_TYPE: "quorum"
+  MONGO_URL: {{ ("mongodb://openhvx:" ~ secrets["mongo_password"] ~ "@mongo-0.mongo.openhvx.svc.cluster.local:27017,mongo-1.mongo.openhvx.svc.cluster.local:27017,mongo-2.mongo.openhvx.svc.cluster.local:27017/openhvx-ceph?replicaSet=rs0&authSource=admin&w=majority") | tojson }}
+  CEPH_API_URL: "https://192.168.50.30:8443"
+  CEPH_API_USER: "openhvx"
+  CEPH_API_PASSWORD: {{ (secrets["ceph_dashboard_password"]) | tojson }}
+  CEPH_DEFAULT_POOL: "rbd"
+  CEPH_GW_ISCSI_HOST: "openhvx-ceph-01"
+  CEPH_GW_ISCSI_IP: "192.168.50.31"
+  CEPH_INSECURE_TLS: "false"
+  NODE_EXTRA_CA_CERTS: "/trust/ca.pem"
+  INVENTORY_INTERVAL_MS: "60000"

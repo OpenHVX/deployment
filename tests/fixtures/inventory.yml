@@ -1,0 +1,15 @@
+# Offline parsing only. Test commands must never execute tasks against this inventory.
+all:
+  children:
+    hyperv:
+      hosts:
+        lab-hv01:
+          ansible_host: 192.0.2.10
+    cp:
+      hosts:
+        openhvx-cp-01:
+          ansible_host: 192.0.2.21
+    ceph:
+      hosts:
+        openhvx-ceph-01:
+          ansible_host: 192.0.2.31

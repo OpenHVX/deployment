@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-env
+  namespace: openhvx
+type: Opaque
+stringData:
+  NODE_ENV: "production"
+  CORS_ORIGIN: "https://192.168.50.20"
+  LOG_JSON: "1"
+  LOG_LEVEL: "info"
+  PORT: "4000"
+  MONGO_URL: {{ ("mongodb://openhvx:" ~ secrets["mongo_password"] ~ "@mongo-0.mongo.openhvx.svc.cluster.local:27017,mongo-1.mongo.openhvx.svc.cluster.local:27017,mongo-2.mongo.openhvx.svc.cluster.local:27017/hvwm_auth?replicaSet=rs0&authSource=admin&w=majority") | tojson }}
+  JWT_TENANT_SECRET: {{ (secrets["JWT_TENANT_SECRET"]) | tojson }}
+  JWT_ADMIN_SECRET: {{ (secrets["JWT_ADMIN_SECRET"]) | tojson }}
+  REGISTER_ENABLED: {{ (settings.register_enabled) | tojson }}
+  REGISTER_API_KEY: {{ (secrets["REGISTER_API_KEY"]) | tojson }}

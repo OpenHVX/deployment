@@ -1,0 +1,9 @@
+---
+- name: Deploy OpenHVX and initialize its data services
+  hosts: cp[0]
+  become: true
+  tasks:
+    - name: Run openhvx_backend main tasks
+      ansible.builtin.import_role:
+        name: openhvx_backend
+        tasks_from: main

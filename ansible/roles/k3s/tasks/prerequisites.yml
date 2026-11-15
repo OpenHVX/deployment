@@ -1,0 +1,21 @@
+---
+- name: Wait for authenticated SSH
+  ansible.builtin.wait_for_connection:
+    timeout: 600
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name: [curl, ca-certificates, chrony, python3, lvm2, podman]
+    update_cache: true
+    state: present
+- name: Configure infrastructure name resolution
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for host in groups['all'] %}
+      {{ hostvars[host].ansible_host }} {{ host }}
+      {% endfor %}
+- name: Enable time synchronization
+  ansible.builtin.service:
+    name: chrony
+    state: started
+    enabled: true

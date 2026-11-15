@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: openhvx
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app: mongo
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: mongo
+        image: mongo:7.0.24
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 27017
+        envFrom:
+        - secretRef:
+            name: mongo-env
+        resources:
+          requests:
+            cpu: 200m
+            memory: 600Mi
+          limits:
+            memory: 1500Mi
+        args:
+        - --replSet
+        - rs0
+        - --bind_ip_all
+        - --keyFile
+        - /keys/keyfile
+        - --wiredTigerCacheSizeGB
+        - '0.5'
+        volumeMounts:
+        - name: data
+          mountPath: /data/db
+        - name: keys
+          mountPath: /keys
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: 27017
+          initialDelaySeconds: 10
+      terminationGracePeriodSeconds: 45
+      volumes:
+      - name: key-source
+        secret:
+          secretName: mongo-internal
+      - name: keys
+        emptyDir: {}
+      initContainers:
+      - name: keys
+        image: mongo:7.0.24
+        command:
+        - sh
+        - -c
+        - cp /source/keyfile /keys/keyfile && chmod 400 /keys/keyfile && chown 999:999
+          /keys/keyfile
+        volumeMounts:
+        - name: key-source
+          mountPath: /source
+        - name: keys
+          mountPath: /keys
+  serviceName: mongo
+  podManagementPolicy: Parallel
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 8Gi

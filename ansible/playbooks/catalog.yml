@@ -1,0 +1,9 @@
+---
+- name: Seed a reusable Ubuntu image in the Ceph catalog
+  hosts: ceph[0]
+  become: true
+  tasks:
+    - name: Run ceph_catalog main tasks
+      ansible.builtin.import_role:
+        name: ceph_catalog
+        tasks_from: main

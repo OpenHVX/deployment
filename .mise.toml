@@ -5,6 +5,7 @@ jq = "1.7.1"
 yq = "4.44.2"
 age = "1.2.1"
 sops = "3.9.4"
+kustomize = "5.7.1"
 
 [env]
 _.path = ["{{config_root}}/.venv/bin"]
@@ -49,16 +50,16 @@ run = "python lab/scripts/prepare-windows.py"
 run = "./lab/scripts/test-lab.sh"
 
 [tasks."ansible:rdp"]
-run = "PLATFORM_PLAYBOOK=platform/ansible/playbooks/rdp.yml ./lab/scripts/run-platform.sh"
+run = "PLATFORM_PLAYBOOK=ansible/playbooks/rdp.yml ./lab/scripts/run-platform.sh"
 
 [tasks."lab:hosts:up"]
 run = "./lab/scripts/lab-hosts-up.sh"
 
 [tasks."platform:deploy"]
-run = "./platform/deploy.sh"
+run = "./scripts/deploy.sh"
 
 [tasks."platform:verify"]
-run = "PLATFORM_PLAYBOOK=platform/ansible/playbooks/verify.yml ./platform/deploy.sh"
+run = "PLATFORM_PLAYBOOK=ansible/playbooks/verify.yml ./scripts/deploy.sh"
 
 [tasks."lab:platform:up"]
 run = "python lab/scripts/platform-up.py"
@@ -91,7 +92,7 @@ run = "python lab/scripts/vyos-up.py"
 run = "python lab/scripts/inspect-network.py"
 
 [tasks."lab:network:vyos-image"]
-run = "python lab/scripts/build-vyos-image.py"
+run = "python image-builds/vyos/build.py"
 
 [tasks."lab:network:vyos-status"]
 run = "python lab/scripts/vyos-status.py"
@@ -101,3 +102,15 @@ run = "python lab/scripts/verify-vyos.py"
 
 [tasks."lab:network:vyos-down"]
 run = "python lab/scripts/vyos-down.py"
+
+[tasks."lab:images:build"]
+run = "python lab/scripts/build-images.py"
+
+[tasks."lab:infrastructure:up"]
+run = "python lab/scripts/platform-up.py --infrastructure-only"
+
+[tasks."kubernetes:inspect"]
+run = "kustomize build kubernetes/overlays/lab"
+
+[tasks."kubernetes:render"]
+run = "python kubernetes/render.py --work .lab/infra --ca .lab/ca.pem"

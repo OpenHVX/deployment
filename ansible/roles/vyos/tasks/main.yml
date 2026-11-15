@@ -1,0 +1,20 @@
+---
+- name: Require a verified cloud-init image and explicit per-host declarations
+  ansible.builtin.assert:
+    that:
+      - vyos_image_sha256 is match('^[a-f0-9]{64}$')
+      - vyos_hosts[inventory_hostname] is defined
+      - vyos_media_url is match('^https?://')
+- name: Create or verify the management-only router VM
+  ansible.windows.win_powershell:
+    script: "{{ lookup('ansible.builtin.file', playbook_dir + '/../powershell/Ensure-VyosVM.ps1') }}"
+    parameters:
+      Name: "{{ vyos_hosts[inventory_hostname].name }}"
+      ImageUrl: "{{ vyos_media_url }}/{{ vyos_image_filename }}"
+      ImageSha256: "{{ vyos_image_sha256 }}"
+      DeploymentId: "{{ vyos_deployment_id }}"
+      MacAddress: "{{ vyos_hosts[inventory_hostname].mac_address }}"
+      SeedUrl: "{{ vyos_media_url }}/{{ vyos_hosts[inventory_hostname].seed }}"
+      SeedSha256: "{{ vyos_hosts[inventory_hostname].seed_sha256 }}"
+      SwitchName: "{{ vyos_management_switch | default('OpenHVX-Management') }}"
+      SystemGiB: "{{ vyos_system_gib }}"

@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../base
+images:
+- name: openhvx/auth
+  newTag: lab-7269b72fa206
+- name: openhvx/controller
+  newTag: lab-5e357079def7
+- name: openhvx/api-gateway
+  newTag: lab-5e357079def7
+- name: openhvx/ws-broker
+  newTag: lab-7269b72fa206
+- name: openhvx/network-orchestrator
+  newTag: lab-5e357079def7
+- name: openhvx/ceph-connector
+  newTag: lab-7269b72fa206

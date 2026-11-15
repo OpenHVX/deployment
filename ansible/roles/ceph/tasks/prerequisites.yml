@@ -1,0 +1,19 @@
+---
+- name: Download cephadm
+  ansible.builtin.get_url:
+    url: https://download.ceph.com/rpm-squid/el9/noarch/cephadm
+    dest: /usr/local/sbin/cephadm
+    mode: '0755'
+- name: Enable kernel modules needed by iSCSI gateways
+  ansible.builtin.shell: |
+    modprobe target_core_user
+    modprobe iscsi_target_mod
+    printf 'target_core_user\niscsi_target_mod\n' > /etc/modules-load.d/openhvx-iscsi.conf
+  changed_when: false
+- name: Inspect dedicated OSD disk
+  ansible.builtin.command: lsblk -b -ndo SIZE /dev/sdb
+  register: osd_size
+  changed_when: false
+- name: Require the declared dedicated OSD device
+  ansible.builtin.assert:
+    that: osd_size.stdout | int == 60 * 1024 * 1024 * 1024

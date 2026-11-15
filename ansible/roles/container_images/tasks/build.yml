@@ -1,0 +1,35 @@
+---
+- name: Install image build engine
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+- name: Start image build engine
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+- name: Create build directories
+  ansible.builtin.file:
+    path: "/root/openhvx-build/{{ item }}"
+    state: directory
+    mode: '0700'
+  loop: "{{ image_names | default(['auth', 'api-gateway', 'controller', 'ws-broker', 'network-orchestrator', 'ceph-connector']) }}"
+- name: Unpack source snapshots
+  ansible.builtin.unarchive:
+    src: "{{ infra_work }}/build/{{ item }}.tgz"
+    dest: "/root/openhvx-build/{{ item }}"
+  loop: "{{ image_names | default(['auth', 'api-gateway', 'controller', 'ws-broker', 'network-orchestrator', 'ceph-connector']) }}"
+- name: Build versioned application images
+  ansible.builtin.command: "docker build -t openhvx/{{ item }}:{{ image_tag }} /root/openhvx-build/{{ item }}"
+  loop: "{{ image_names | default(['auth', 'api-gateway', 'controller', 'ws-broker', 'network-orchestrator', 'ceph-connector']) }}"
+- name: Export immutable deployment image bundle
+  ansible.builtin.shell: >-
+    set -o pipefail; docker save {% for name in image_names | default(['auth','api-gateway','controller','ws-broker','network-orchestrator','ceph-connector']) %} openhvx/{{ name }}:{{ image_tag }}{% endfor %}
+    | gzip > /root/openhvx-images.tar.gz
+  args:
+    executable: /bin/bash
+- name: Fetch bundle to deployment controller
+  ansible.builtin.fetch:
+    src: /root/openhvx-images.tar.gz
+    dest: "{{ infra_work }}/images.tar.gz"
+    flat: true
