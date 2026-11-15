@@ -1,18 +1,11 @@
 ---
-- name: Require no unresolved backend tasks before the rollout
-  ansible.builtin.command:
-    argv:
-      - k3s
-      - kubectl
-      - -n
-      - openhvx
-      - exec
-      - deployment/controller
-      - --
-      - node
-      - -e
-      - "{{ lookup('ansible.builtin.file', playbook_dir + '/../../kubernetes/operations/assert-no-active-tasks.cjs') }}"
-  changed_when: false
+# The lab entry point installs/verifies the API gate and drains accepted work.
+# Refuse standalone role execution that accidentally bypasses this procedure.
+- name: Require the shared deployment maintenance procedure
+  ansible.builtin.assert:
+    that: deployment_maintenance_verified | default(false) | bool
+    fail_msg: 'Use lab:platform:up or lab:network:deploy; enter maintenance before changing workloads/agents.'
+
 - name: Select the declared controller, gateway and executor resources from the rendered manifest
   ansible.builtin.set_fact:
     network_objects: "{{ lookup('ansible.builtin.file', infra_work + '/openhvx.yml') | from_yaml_all | selectattr('metadata.name', 'in', ['controller', 'controller-env', 'api-gateway', 'api-gateway-env', 'network-orchestrator', 'network-orchestrator-env']) | list }}"

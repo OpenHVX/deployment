@@ -1,4 +1,15 @@
 ---
+# Check every node before Docker builds anything. A partial previous import must
+# not be overwritten by rerunning the same release.
+- name: Reserve an unused release version across the K3s nodes
+  hosts: cp
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Check the release version
+      ansible.builtin.import_role:
+        name: container_images
+        tasks_from: check-release
 - name: Build OpenHVX container images on the first control VM
   hosts: cp[0]
   become: true

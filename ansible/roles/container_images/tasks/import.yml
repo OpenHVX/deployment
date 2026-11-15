@@ -1,8 +1,24 @@
 ---
 - name: Copy deployment image bundle
   ansible.builtin.copy:
-    src: "{{ infra_work }}/images.tar.gz"
-    dest: /root/openhvx-images.tar.gz
+    src: "{{ image_release_dir }}/images.tar.gz"
+    dest: /root/openhvx-images-{{ image_tag }}.tar.gz
     mode: '0600'
+# The copy module verifies transfer integrity. Check SHA256 as well so the receipt
+# and the bundle imported by every node refer to exactly the same artifact.
+- name: Read the release receipt
+  ansible.builtin.set_fact:
+    image_receipt: "{{ lookup('ansible.builtin.file', image_release_dir + '/image-receipt.json') | from_json }}"
+
+- name: Calculate the received bundle checksum
+  ansible.builtin.stat:
+    path: "/root/openhvx-images-{{ image_tag }}.tar.gz"
+    checksum_algorithm: sha256
+  register: received_bundle
+
+- name: Require the bundle recorded by the builder
+  ansible.builtin.assert:
+    that: received_bundle.stat.checksum == image_receipt.bundleSha256
+
 - name: Import images into the K3s container runtime
-  ansible.builtin.command: k3s ctr images import /root/openhvx-images.tar.gz
+  ansible.builtin.command: k3s ctr images import /root/openhvx-images-{{ image_tag }}.tar.gz

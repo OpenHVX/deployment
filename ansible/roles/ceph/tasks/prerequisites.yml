@@ -4,12 +4,22 @@
     url: https://download.ceph.com/rpm-squid/el9/noarch/cephadm
     dest: /usr/local/sbin/cephadm
     mode: '0755'
-- name: Enable kernel modules needed by iSCSI gateways
-  ansible.builtin.shell: |
-    modprobe target_core_user
-    modprobe iscsi_target_mod
-    printf 'target_core_user\niscsi_target_mod\n' > /etc/modules-load.d/openhvx-iscsi.conf
-  changed_when: false
+# Report both runtime loading and persistent configuration honestly. A second
+# run should stay unchanged when the modules and file already match.
+- name: Load the iSCSI gateway kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: [target_core_user, iscsi_target_mod]
+
+- name: Load the gateway modules after reboot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/openhvx-iscsi.conf
+    content: |
+      target_core_user
+      iscsi_target_mod
+    mode: '0644'
+
 - name: Inspect dedicated OSD disk
   ansible.builtin.command: lsblk -b -ndo SIZE /dev/sdb
   register: osd_size

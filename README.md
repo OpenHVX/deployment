@@ -25,6 +25,7 @@ mise run test
 
 | Task | Guide |
 | --- | --- |
+| Install the lab and connect to K3s/OpenHVX | [Lab setup and access](docs/10-lab-setup-and-access.md) |
 | Understand the layout and edit configuration | [Repository structure](docs/02-deployment-structure.md) |
 | Provision Windows hosts on blank lab disks | [Windows installation](docs/04-unattended-windows.md) |
 | Deploy or resume OpenHVX | [Lab deployment](docs/05-lab-platform.md) |

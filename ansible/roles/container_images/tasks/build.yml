@@ -8,28 +8,57 @@
     name: docker
     state: started
     enabled: true
+# A dedicated context prevents deleted source files from surviving a later build.
+# Even an unpublished failed attempt must not leave files for the next attempt.
+- name: Remove only this unpublished release's build context
+  ansible.builtin.file:
+    path: "/root/openhvx-build/{{ image_tag }}"
+    state: absent
+
 - name: Create build directories
   ansible.builtin.file:
-    path: "/root/openhvx-build/{{ item }}"
+    path: "/root/openhvx-build/{{ image_tag }}/{{ item }}"
     state: directory
     mode: '0700'
-  loop: "{{ image_names | default(['auth', 'api-gateway', 'controller', 'ws-broker', 'network-orchestrator', 'ceph-connector']) }}"
+  loop: "{{ image_names }}"
 - name: Unpack source snapshots
   ansible.builtin.unarchive:
-    src: "{{ infra_work }}/build/{{ item }}.tgz"
-    dest: "/root/openhvx-build/{{ item }}"
-  loop: "{{ image_names | default(['auth', 'api-gateway', 'controller', 'ws-broker', 'network-orchestrator', 'ceph-connector']) }}"
+    src: "{{ image_release_dir }}/build/{{ item }}.tgz"
+    dest: "/root/openhvx-build/{{ image_tag }}/{{ item }}"
+  loop: "{{ image_names }}"
 - name: Build versioned application images
-  ansible.builtin.command: "docker build -t openhvx/{{ item }}:{{ image_tag }} /root/openhvx-build/{{ item }}"
-  loop: "{{ image_names | default(['auth', 'api-gateway', 'controller', 'ws-broker', 'network-orchestrator', 'ceph-connector']) }}"
+  ansible.builtin.command: "docker build -t openhvx/{{ item }}:{{ image_tag }} /root/openhvx-build/{{ image_tag }}/{{ item }}"
+  loop: "{{ image_names }}"
 - name: Export immutable deployment image bundle
   ansible.builtin.shell: >-
-    set -o pipefail; docker save {% for name in image_names | default(['auth','api-gateway','controller','ws-broker','network-orchestrator','ceph-connector']) %} openhvx/{{ name }}:{{ image_tag }}{% endfor %}
-    | gzip > /root/openhvx-images.tar.gz
+    set -o pipefail; docker save {% for name in image_names %} openhvx/{{ name }}:{{ image_tag }}{% endfor %}
+    | gzip > /root/openhvx-build/{{ image_tag }}/images.tar.gz
   args:
     executable: /bin/bash
 - name: Fetch bundle to deployment controller
   ansible.builtin.fetch:
-    src: /root/openhvx-images.tar.gz
-    dest: "{{ infra_work }}/images.tar.gz"
+    src: /root/openhvx-build/{{ image_tag }}/images.tar.gz
+    dest: "{{ image_release_dir }}/images.tar.gz"
     flat: true
+
+# Docker IDs identify the built image configuration/rootfs. They are provenance
+# for this side-loaded bundle, not registry manifest digests to put in newTag.
+- name: Record built image IDs
+  ansible.builtin.command: "docker image inspect --format '{{ '{{' }}.Id{{ '}}' }}' openhvx/{{ item }}:{{ image_tag }}"
+  loop: "{{ image_names }}"
+  register: built_image_ids
+  changed_when: false
+
+- name: Calculate the exact exported bundle checksum
+  ansible.builtin.stat:
+    path: "/root/openhvx-build/{{ image_tag }}/images.tar.gz"
+    checksum_algorithm: sha256
+  register: image_bundle
+
+- name: Save release provenance on the workstation
+  ansible.builtin.copy:
+    content: "{{ {'tag': image_tag, 'bundleSha256': image_bundle.stat.checksum, 'images': dict(built_image_ids.results | map(attribute='item') | zip(built_image_ids.results | map(attribute='stdout')))} | to_nice_json }}"
+    dest: "{{ image_release_dir }}/image-receipt.json"
+    mode: '0600'
+  delegate_to: localhost
+  become: false

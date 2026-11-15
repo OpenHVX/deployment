@@ -51,16 +51,43 @@
     mode: '0600'
   delegate_to: "{{ item }}"
   loop: "{{ groups['ceph'] }}"
-- name: Enroll Ceph hosts
-  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch host add {{ item }} {{ hostvars[item].ansible_host }}"
+# Query before mutation. In particular, never silently repoint an existing host:
+# changing an address can disconnect daemons and belongs in a maintenance plan.
+- name: Read the enrolled Ceph hosts
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch host ls --format json
+  register: enrolled_ceph_hosts
+  changed_when: false
+
+- name: Require existing Ceph host addresses to match the inventory
+  ansible.builtin.assert:
+    that: (enrolled_ceph_hosts.stdout | from_json | selectattr('hostname', 'equalto', item) | first).addr == hostvars[item].ansible_host
+    fail_msg: 'An existing Ceph host has another address; inspect and plan the change explicitly.'
+  when: item in (enrolled_ceph_hosts.stdout | from_json | map(attribute='hostname') | list)
   loop: "{{ groups['ceph'] }}"
+
+- name: Enroll only missing Ceph hosts
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch host add {{ item }} {{ hostvars[item].ansible_host }}"
+  when: item not in (enrolled_ceph_hosts.stdout | from_json | map(attribute='hostname') | list)
+  loop: "{{ groups['ceph'] }}"
+
+- name: Read the current OSD memory target
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph config get osd osd_memory_target
+  register: osd_memory_target
   changed_when: false
-- name: Tune OSD memory for the nested lab
+
+- name: Tune OSD memory only when it differs
   ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph config set osd osd_memory_target 2147483648
+  when: osd_memory_target.stdout | trim | int != 2147483648
+
+- name: Read the monitor placement specification
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch ls --service_name mon --export --format json
+  register: monitor_specification
   changed_when: false
-- name: Place three monitors
-  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph orch apply mon --placement=3"
-  changed_when: false
+
+- name: Place three monitors when the declared count differs
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch apply mon --placement=3
+  when: (monitor_specification.stdout | from_json | first).placement.count | default(0) | int != 3
+
 - name: Read existing OSD placement
   ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch ps --daemon-type osd --format json
   register: existing_osds
@@ -84,10 +111,19 @@
   ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph osd pool create {{ item }}"
   when: item not in (pools.stdout | from_json)
   loop: [rbd, catalog]
-- name: Enable RBD pool application
-  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- rbd pool init {{ item }}"
+- name: Read pool application metadata
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- ceph osd pool application get {{ item }} --format json"
   loop: [rbd, catalog]
+  register: pool_applications
   changed_when: false
+
+- name: Initialize pools that are not yet marked for RBD
+  ansible.builtin.command: "/usr/local/sbin/cephadm shell -- rbd pool init {{ item.item }}"
+  loop: "{{ pool_applications.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  when: "'rbd' not in (item.stdout | from_json)"
+
 - name: Render iSCSI service specification
   ansible.builtin.copy:
     dest: /root/openhvx-iscsi.yml
@@ -104,6 +140,25 @@
         api_secure: false
         trusted_ip_list: {{ (groups['ceph'] | map('extract', hostvars, 'ansible_host') | list) | join(',') }}
   no_log: true
-- name: Apply iSCSI gateway service
-  ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/openhvx-iscsi.yml:/root/openhvx-iscsi.yml -- ceph orch apply -i /root/openhvx-iscsi.yml
+
+# Retrying an unchanged spec is not a mutation. A changed file is applied once;
+# if application fails, the next run must still retry. Compare the live service
+# with the intended fields instead of using a local 'last applied' marker.
+- name: Read the live iSCSI service specification
+  ansible.builtin.command: /usr/local/sbin/cephadm shell -- ceph orch ls --service_name iscsi.openhvx --export --format json
+  register: live_iscsi_service
   changed_when: false
+  no_log: true
+
+- name: Decode the live and desired iSCSI specifications
+  ansible.builtin.set_fact:
+    desired_iscsi: "{{ {'pool': 'rbd', 'api_user': 'openhvx', 'api_password': ceph_iscsi_password, 'api_secure': false, 'trusted_ip_list': (groups['ceph'] | map('extract', hostvars, 'ansible_host') | list) | join(',')} }}"
+    live_iscsi: "{{ (live_iscsi_service.stdout | from_json | first) | default({}) }}"
+  no_log: true
+
+- name: Apply the iSCSI service only when managed settings differ
+  ansible.builtin.command: /usr/local/sbin/cephadm shell --mount /root/openhvx-iscsi.yml:/root/openhvx-iscsi.yml -- ceph orch apply -i /root/openhvx-iscsi.yml
+  when: >-
+    (live_iscsi.placement.hosts | default([]) | sort) != (groups['ceph'] | sort)
+    or (live_iscsi.spec | default({}) | dict2items | selectattr('key', 'in', desired_iscsi.keys() | list) | items2dict) != desired_iscsi
+  no_log: true

@@ -1,0 +1,16 @@
+---
+- name: Resume public API admission after inspection or infrastructure work
+  hosts: cp[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Inspect platform workloads
+      ansible.builtin.command: k3s kubectl -n openhvx get deployment/controller statefulset/mongo --ignore-not-found -o name
+      register: resume_platform
+      changed_when: false
+
+    - name: Verify workloads and reopen an existing platform
+      ansible.builtin.include_role:
+        name: deployment_maintenance
+        tasks_from: exit
+      when: resume_platform.stdout | trim | length > 0

@@ -85,7 +85,7 @@ They can remain as historical evidence.
 
 For a new lab, provision the Windows hosts, then `mise run lab:infrastructure:up`
 to prepare Linux VMs, K3s and Ceph. Build/import application images with
-`mise run lab:images:build`. The command prints a content-derived tag; it does not
+`mise run lab:images:build`. The command prints a unique release tag; it does not
 change the declared release. Review and set the desired tags in
 `kubernetes/overlays/lab/kustomization.yaml`, then run `mise run lab:platform:up`.
 An existing lab can deploy its already imported declared images directly.
@@ -97,7 +97,7 @@ and apply again. Registration is no longer changed by a hidden marker file.
 staged workflow above to prepare and promote images first.
 
 `mise run lab:network:deploy` renders and applies the declared controller, gateway
-and executor resources through Ansible, after verifying there are no unresolved
+and executor resources through Ansible, inside the shared API maintenance window, after draining unresolved
 tasks. It neither builds images nor patches image tags through SSH. VyOS lifecycle
 commands remain separate; the current executor is plan-only.
 
@@ -133,3 +133,10 @@ identical. Both report the existing libvirt interface-address drift on three
 Windows domains (refreshed address lists are empty, while configuration declares
 static management IPs). No replacement is planned. This drift was not applied or
 silenced by the refactor.
+
+## Maintaining the implementation
+
+See [maintaining deployment](11-maintaining-deployment.md) for the execution map,
+release receipts, bootstrap-change refusal, shared operation lock and failure
+recovery. Public API admission is closed during supported deployment workflows;
+`lab:maintenance:resume` explicitly reopens it after workload readiness checks.

@@ -36,6 +36,17 @@ replacement. No apply or live lifecycle acceptance was performed during this che
 Private evidence is under `.lab/refactor-2026-11-15/`, including `validation.txt`,
 `checks.log` and the saved comparison plans.
 
+## Subsequent safety changes awaiting lab acceptance
+
+The current working changes add clean per-release build contexts, unique release
+versions and image/bundle receipts; existing seed content is checked before media
+or inventory changes. Shared deployment maintenance closes public API admission
+before draining tasks, and leaves the gate installed after rollout failures.
+Ceph mutations now compare managed live settings instead of hiding changes.
+
+These changes are covered by offline safety tests, not a new live acceptance.
+See [maintaining deployment](11-maintaining-deployment.md) for checks and recovery.
+
 ## Limitations
 
 - Network Orchestrator executes planning only. VyOS API access, provider effects,

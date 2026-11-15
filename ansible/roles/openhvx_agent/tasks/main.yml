@@ -1,4 +1,11 @@
 ---
+# The lab entry point installs/verifies the API gate and drains accepted work.
+# Refuse standalone role execution that accidentally bypasses this procedure.
+- name: Require the shared deployment maintenance procedure
+  ansible.builtin.assert:
+    that: deployment_maintenance_verified | default(false) | bool
+    fail_msg: 'Use lab:platform:up or lab:network:deploy; enter maintenance before changing workloads/agents.'
+
 - name: Create protected runtime and journal directories
   ansible.windows.win_powershell:
     script: |

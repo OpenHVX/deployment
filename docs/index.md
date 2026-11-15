@@ -9,6 +9,7 @@ past decisions and evidence without defining present behavior.
 
 | Task | Document | Type |
 | --- | --- | --- |
+| Install the lab and access K3s/OpenHVX | [Lab setup and access](10-lab-setup-and-access.md) | Runbook |
 | Understand what is implemented and verified | [Current status](01-status.md) | Status |
 | Find the source file to modify | [Repository structure](02-deployment-structure.md) | Reference |
 | Deploy and operate the lab platform | [Lab deployment](05-lab-platform.md) | Runbook |
@@ -18,6 +19,7 @@ past decisions and evidence without defining present behavior.
 | Deploy and inspect logical VPC planning | [Network PoC](07-network-poc.md) | Runbook |
 | Inspect Kubernetes sources and private rendering | [Kubernetes resources](../kubernetes/README.md) | Component reference |
 | Find the VyOS image factory | [VyOS image](../image-builds/vyos/README.md) | Component reference |
+| Maintain scripts/playbooks and recover deployments | [Maintaining deployment](11-maintaining-deployment.md) | Reference |
 | Write or update documentation | [Documentation standard](09-documentation-standard.md) | Reference |
 
 ## Historical records

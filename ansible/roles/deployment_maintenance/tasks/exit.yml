@@ -1,0 +1,21 @@
+---
+# Do not reopen admission merely because the apply command returned successfully.
+# A human can run this procedure after repairing a failed rollout; it still checks
+# all application workloads before removing the gate.
+- name: Wait for the platform before reopening API admission
+  ansible.builtin.command: "k3s kubectl -n openhvx rollout status {{ item }} --timeout=300s"
+  loop:
+    - statefulset/mongo
+    - statefulset/rabbitmq
+    - deployment/auth
+    - deployment/controller
+    - deployment/api-gateway
+    - statefulset/ws-broker
+    - deployment/ceph-connector
+    - deployment/network-orchestrator
+  changed_when: false
+
+- name: Remove the temporary API gate after a successful rollout
+  ansible.builtin.command: k3s kubectl -n openhvx delete ingressroute/openhvx-maintenance middleware/openhvx-maintenance --ignore-not-found
+  register: maintenance_delete
+  changed_when: "'deleted' in maintenance_delete.stdout"

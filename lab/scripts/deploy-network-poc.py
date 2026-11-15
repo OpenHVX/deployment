@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-"""Apply the declared network PoC release through Ansible."""
-import os
-from pathlib import Path
+"""Apply the declared network release inside the shared maintenance procedure."""
 import subprocess
 import sys
-
-ROOT = Path(__file__).resolve().parents[2]
-WORK = ROOT / '.lab/infra'
+from lab_runtime import ROOT, WORK, ensure_lab_lock, run_playbook
 
 
 def main():
+    ensure_lab_lock()
     subprocess.run([sys.executable, str(ROOT / 'kubernetes/render.py'),
                     '--work', str(WORK), '--ca', str(ROOT / '.lab/ca.pem')], check=True)
-    subprocess.run([str(ROOT / 'scripts/deploy.sh'), '-e', 'infra_work=' + str(WORK)],
-                   cwd=ROOT, check=True, env={**os.environ,
-                       'PLATFORM_INVENTORY': str(WORK / 'linux.yml'),
-                       'PLATFORM_PLAYBOOK': 'ansible/playbooks/network-orchestrator.yml'})
-    print('Declared network PoC release applied. Run lab:network:verify.')
+    try:
+        run_playbook('maintenance', '-e', 'maintenance_action=enter')
+        run_playbook('network-orchestrator', '-e', 'deployment_maintenance_verified=true')
+        run_playbook('maintenance', '-e', 'maintenance_action=exit')
+    except Exception:
+        print('Network deployment stopped. The API gate remains closed if installed. '
+              'Inspect the failure; rerun after repair or use lab:maintenance:resume.', file=sys.stderr)
+        raise
+    print('Declared network release applied; public API admission restored.')
 
 
 if __name__ == '__main__':

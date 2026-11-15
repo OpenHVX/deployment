@@ -1,0 +1,24 @@
+---
+# A release is a one-shot build. Never replace an already imported tag: pods use
+# IfNotPresent and could otherwise run different bytes under the same version.
+- name: Validate the release tag before using it in commands and paths
+  ansible.builtin.assert:
+    that:
+      - image_tag is match('^lab-[a-f0-9]{32}$')
+      - image_release_dir is defined
+      - image_names is sequence and image_names is not string
+      - image_names | length > 0
+      - image_names | select('match', '^[a-z][a-z0-9-]*$') | list | length == image_names | length
+
+- name: Read existing image references on this node
+  ansible.builtin.command: k3s ctr images list --quiet
+  register: existing_image_references
+  changed_when: false
+
+- name: Refuse to reuse a published version
+  ansible.builtin.assert:
+    that:
+      - "('docker.io/openhvx/' + item + ':' + image_tag) not in existing_image_references.stdout_lines"
+      - "('openhvx/' + item + ':' + image_tag) not in existing_image_references.stdout_lines"
+    fail_msg: 'This release already exists on a node. Start a new build; do not overwrite it.'
+  loop: "{{ image_names }}"

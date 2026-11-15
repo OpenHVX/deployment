@@ -1,0 +1,68 @@
+---
+- name: Inspect existing platform workloads
+  ansible.builtin.command: k3s kubectl -n openhvx get deployment/controller statefulset/mongo --ignore-not-found -o name
+  register: existing_platform
+  changed_when: false
+
+# An empty first installation has no operations to drain and no ingress TLS yet.
+# A partially installed platform is NOT empty: install the gate and fail safely
+# if the controller cannot prove there are no unresolved tasks.
+- name: Close public API admission on an existing platform
+  when: existing_platform.stdout | trim | length > 0
+  block:
+    - name: Stage the public maintenance resources
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../kubernetes/maintenance/api-gate.yaml"
+        dest: /root/openhvx-maintenance.yaml
+        mode: '0600'
+
+    - name: Install the API gate independently of application manifests
+      ansible.builtin.command: k3s kubectl apply -f /root/openhvx-maintenance.yaml
+      register: maintenance_apply
+      changed_when: "'created' in maintenance_apply.stdout or 'configured' in maintenance_apply.stdout"
+
+    # Test each ingress replica, not just the floating VIP. Allow time for Traefik
+    # to consume the CRDs before checking MongoDB. Without this check, a router
+    # configuration error could leave task submission open during the rollout.
+    - name: Verify every ingress node refuses public API requests
+      ansible.builtin.uri:
+        url: "https://{{ hostvars[item].ansible_host }}/api/v1/healthz"
+        headers:
+          Host: admin-api.openhvx.lab
+        ca_path: "{{ infra_work }}/../ca.pem"
+        validate_certs: true
+        status_code: 403
+        return_content: true
+      delegate_to: localhost
+      become: false
+      loop: "{{ groups['cp'] }}"
+      register: maintenance_probe
+      until: maintenance_probe.status | default(0) == 403 and maintenance_probe.content | default('') | trim == 'Forbidden'
+      retries: 20
+      delay: 2
+
+    # Requests admitted immediately before the gate can still be inside the
+    # gateway's 20-second upstream timeout. Let them settle before checking the
+    # durable task journal, otherwise a late insert could race the first check.
+    - name: Let requests admitted before maintenance finish
+      ansible.builtin.pause:
+        seconds: 30
+
+    - name: Wait for admitted operations to finish before changing services
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - -n
+          - openhvx
+          - exec
+          - deployment/controller
+          - --
+          - node
+          - -e
+          - "{{ lookup('ansible.builtin.file', playbook_dir + '/../../kubernetes/operations/assert-no-active-tasks.cjs') }}"
+      register: operation_drain
+      until: operation_drain.rc == 0
+      retries: 30
+      delay: 5
+      changed_when: false

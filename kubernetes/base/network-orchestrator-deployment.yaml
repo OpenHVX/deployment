@@ -29,6 +29,28 @@ spec:
         envFrom:
         - secretRef:
             name: network-orchestrator-env
+        # A running process is not necessarily connected to MongoDB/RabbitMQ.
+        # Gate admission on the worker's own readiness endpoint before maintenance
+        # can reopen public API traffic.
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 3002
+          periodSeconds: 10
+          timeoutSeconds: 5
+        startupProbe:
+          httpGet:
+            path: /healthz
+            port: 3002
+          failureThreshold: 60
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 3002
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
         resources:
           requests:
             cpu: 100m

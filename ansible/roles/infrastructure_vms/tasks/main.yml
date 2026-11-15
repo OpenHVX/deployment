@@ -1,8 +1,11 @@
 ---
+# A seed is immutable bootstrap input. Existing guests must never silently retain
+# a different seed when the inventory declares a new one.
 - name: Ensure declared infrastructure VMs without replacing existing disks
   ansible.windows.win_powershell:
     script: "{{ lookup('ansible.builtin.file', playbook_dir + '/../powershell/Ensure-InfrastructureVM.ps1') }}"
     parameters:
+      VerifyExistingSeed: true
       ResumePreparedDisk: "{{ infra_resume_disks | default(false) | bool }}"
       Name: "{{ item.name }}"
       ImageUrl: "{{ infra_media_url }}/ubuntu.vhdx"

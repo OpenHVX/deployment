@@ -2,12 +2,17 @@
 const mongoose = require('mongoose');
 
 (async () => {
-  await mongoose.connect(process.env.MONGO_URL);
+  // Keep a failed observation bounded. Ansible owns the retry interval; a
+  // connection failure must never be interpreted as an empty task journal.
+  await mongoose.connect(process.env.MONGO_URL, {
+    serverSelectionTimeoutMS: 5000,
+    connectTimeoutMS: 5000,
+  });
   try {
     const count = await mongoose.connection.collection('tasks').countDocuments({
       status: { $in: ['queued', 'sent', 'reconciling'] },
     });
-    if (count) throw new Error('Drain unresolved tasks before deployment');
+    if (count) throw new Error(`Drain ${count} unresolved task(s) before deployment`);
   } finally {
     await mongoose.disconnect();
   }

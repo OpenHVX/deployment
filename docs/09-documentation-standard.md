@@ -85,3 +85,14 @@ Update affected procedures with implementation changes. Move superseded narrativ
 into `history/` when they obscure current instructions, preserving evidence and
 adding an archive notice. Check local links, command names, configuration paths,
 heading structure and Git whitespace checks before completing an edit.
+
+## Comments in automation sources
+
+Document operational intent alongside the code. A script's module docstring states
+its inputs/artifacts, side effects and recovery boundary. `main()` should show the
+named stages in execution order. Playbook comments explain ownership, prerequisites
+and why a check must precede a mutation. Avoid narration of obvious assignments.
+
+When a step can leave partial state, explain what is retained and how to resume.
+Link to [maintaining deployment](11-maintaining-deployment.md) for the operator
+procedure; do not hide essential failure behavior only in a separate document.

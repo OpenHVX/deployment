@@ -1,0 +1,17 @@
+---
+# enter closes public HTTP admission before checking active tasks. Existing
+# AMQP/agent traffic stays available so accepted work can finish.
+# exit is explicit: a failed rollout must leave the API gate in place.
+- name: Manage the lab API maintenance window
+  hosts: cp[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Require an explicit maintenance action
+      ansible.builtin.assert:
+        that: maintenance_action in ['enter', 'exit']
+
+    - name: Execute the selected maintenance procedure
+      ansible.builtin.include_role:
+        name: deployment_maintenance
+        tasks_from: "{{ maintenance_action }}"

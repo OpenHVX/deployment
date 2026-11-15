@@ -1,4 +1,11 @@
 ---
+# The lab entry point installs/verifies the API gate and drains accepted work.
+# Refuse standalone role execution that accidentally bypasses this procedure.
+- name: Require the shared deployment maintenance procedure
+  ansible.builtin.assert:
+    that: deployment_maintenance_verified | default(false) | bool
+    fail_msg: 'Use lab:platform:up or lab:network:deploy; enter maintenance before changing workloads/agents.'
+
 - name: Copy private rendered resources
   ansible.builtin.copy:
     src: "{{ infra_work }}/openhvx.yml"
@@ -48,5 +55,5 @@
   changed_when: false
 - name: Wait for backend workloads
   ansible.builtin.command: "k3s kubectl -n openhvx rollout status {{ item }} --timeout=600s"
-  loop: [deployment/auth, deployment/controller, deployment/api-gateway, statefulset/ws-broker, deployment/ceph-connector]
+  loop: [deployment/auth, deployment/controller, deployment/api-gateway, statefulset/ws-broker, deployment/ceph-connector, deployment/network-orchestrator]
   changed_when: false

@@ -1,0 +1,11 @@
+---
+# The lab builds a complete release by default. A targeted operator workflow may
+# override image_names, but every selected image still follows the same version
+# reservation, clean-context build, receipt and import checks.
+image_names:
+  - auth
+  - api-gateway
+  - controller
+  - ws-broker
+  - network-orchestrator
+  - ceph-connector

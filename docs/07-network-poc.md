@@ -28,13 +28,15 @@ adapter uses existing credentials and the trusted CA under `.lab/`.
 mise run lab:network:deploy
 ```
 
-The deployment task requires no unresolved backend tasks. Build/import images
+The deployment task closes public API admission and waits for unresolved backend tasks. Build/import images
 separately with `mise run lab:images:build`, review their tags in
 `kubernetes/overlays/lab/kustomization.yaml`, then apply the declared release.
 `settings.yml` explicitly enables `NETWORK_POC_ENABLED`; no private runtime flag
 controls the desired release. Ansible applies the controller, gateway and executor
 manifests through one path. Inspect Kubernetes state after a partial rollout before
-rerunning. See [deployment structure](02-deployment-structure.md).
+rerunning. The gate remains closed after a failed rollout; follow
+[maintenance recovery](11-maintaining-deployment.md#maintenance-and-recovery).
+See [deployment structure](02-deployment-structure.md).
 
 ## VyOS VM lifecycle
 

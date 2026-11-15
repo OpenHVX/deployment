@@ -37,6 +37,9 @@ quorum queues. Auth, gateway, controller, and WS broker have three replicas each
 Broker identities and peer URLs use StatefulSet DNS. The Ceph connector has one
 active pod and a persistent MongoDB journal. Agent journals remain on Windows.
 
+For a complete first-installation walkthrough, K3s access and API/CLI login, use
+[lab setup and access](10-lab-setup-and-access.md).
+
 ## Prerequisites
 
 Run commands from the repository root. Install the pinned tools and dependencies
@@ -71,7 +74,7 @@ Generated private files:
 | `.lab/infra/admin.json` | Initial admin credentials |
 | `.lab/infra/cli-config.json` | Dedicated lab CLI profile with a 30-day admin PAT |
 | `.lab/infra/openhvx.yml` | Rendered Kubernetes resources, including secrets |
-| `.lab/infra/image-tag` | Source-content deployment version |
+| `.lab/infra/image-tag` | Latest successfully imported candidate tag |
 | `.lab/infra/*-result.json` | Acceptance task records |
 
 Use the lab CLI profile without overwriting your normal profile:
@@ -87,6 +90,13 @@ an uncertain operation. The outbox encryption key, MongoDB data, Ceph data, stor
 identity, and Windows journals must survive upgrades.
 
 ## Procedure
+
+Full and network-only deployments now share the
+[maintenance procedure](11-maintaining-deployment.md#maintenance-and-recovery).
+Public `/api` requests return 403 during maintenance; admitted tasks must finish
+before changes proceed. On failure, inspect the failed stage and follow the
+recovery procedure before reopening admission.
+
 
 For a fresh lab, use separate provisioning, build and deployment steps:
 
